@@ -1,0 +1,41 @@
+[lx-high] {
+    outline: 2px dashed #00d4ff !important;
+    outline-offset: -2px !important;
+    background: rgba(0, 212, 255, 0.05) !important;
+}
+
+[lx-high="pom"] {
+    outline-color: #ff4444 !important;
+    background: rgba(255, 68, 68, 0.05) !important;
+}
+
+[lx-high="anchor"] {
+    outline-color: #ffd700 !important;
+    background: rgba(255, 215, 0, 0.05) !important;
+}
+
+[lx-high="target"] {
+    outline-color: #800080 !important;
+    background: rgba(128, 0, 128, 0.05) !important;
+}
+
+/* Match Logic (Passive) */
+[lx-high="match"] {
+    /* Minimal interference: outline only */
+    outline-color: #2ecc71 !important;
+    background: rgba(46, 204, 113, 0.05) !important;
+}
+
+/* Label Logic - JS Managed Floating Label */
+.lx-high-label {
+    position: fixed !important;
+    z-index: 2147483647 !important;
+    background: #2c3e50 !important;
+    color: #ffffff !important;
+    padding: 2px 6px !important;
+    font: 11px sans-serif !important;
+    border-radius: 3px !important;
+    white-space: nowrap !important;
+    pointer-events: none !important;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2) !important;
+}

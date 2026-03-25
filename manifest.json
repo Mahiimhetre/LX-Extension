@@ -1,0 +1,90 @@
+{
+  "manifest_version": 3,
+  "name": "Locator-X",
+  "version": "1.0.0",
+  "description": "Generate and manage web element locators for test automation",
+  "icons": {
+    "16": "assets/icons/icon16.png",
+    "48": "assets/icons/icon48.png",
+    "128": "assets/icons/icon128.png"
+  },
+  "permissions": [
+    "activeTab",
+    "storage",
+    "sidePanel",
+    "contextMenus",
+    "webNavigation"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "externally_connectable": {
+    "matches": [
+      "http://localhost:3000/*",
+      "http://localhost:3005/*",
+      "https://example.com/*"
+    ]
+  },
+  "background": {
+    "service_worker": "src/background/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/config/constants.js",
+        "src/config/plans.js",
+        "src/services/plan-service.js",
+        "src/services/locator-generator.js",
+        "src/content/domScanner.js"
+      ],
+      "css": [
+        "src/content/highlight.css"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "http://localhost:3005/*",
+        "http://localhost:3000/*",
+        "http://localhost:5173/*"
+      ],
+      "js": [
+        "src/content/auth-sync.js"
+      ],
+      "run_at": "document_end"
+    }
+  ],
+  "side_panel": {
+    "default_path": "src/ui/sidepanel/panel.html"
+  },
+  "action": {
+    "default_title": "Locator-X",
+    "default_icon": {
+      "16": "assets/icons/icon16.png",
+      "48": "assets/icons/icon48.png",
+      "128": "assets/icons/icon128.png"
+    }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/config/constants.js",
+        "src/config/plans.js",
+        "src/services/plan-service.js",
+        "src/services/locator-generator.js",
+        "src/services/storage-manager.js",
+        "src/services/filter-manager.js",
+        "src/services/locator-x-core.js",
+        "src/content/highlight.css"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
+  "devtools_page": "src/ui/devtools/devtools.html"
+}

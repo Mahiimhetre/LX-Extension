@@ -1,0 +1,190 @@
+:root {
+    /* Semantic Palette */
+    --success: #27ae60;
+    --warning: #f39c12;
+    --danger: #e74c3c;
+    --info: #3498db;
+
+    /* Base Colors - Light Theme Default */
+    --primary-bg: #f5f7fa;
+    --secondary-bg: #ffffff;
+    --primary-text: #2c3e50;
+    --secondary-text: #7f8c8d;
+    --accent: var(--info);
+    --accent-rgb: 52, 152, 219;
+    --accent-hover: #2980b9;
+    --border-light: #ecf0f1;
+    --border-dark: #bdc3c7;
+    --highlight: var(--warning);
+
+    /* Status Colors (Light tints for UI backgrounds) */
+    --status-green: #d4edda;
+    --status-green-text: #155724;
+    --status-yellow: #fff3cd;
+    --status-yellow-text: #856404;
+    --status-red: #f8d7da;
+    --status-red-text: #721c24;
+
+    /* Shadows & Effects */
+    --shadow-light: rgba(0, 0, 0, 0.05);
+    --shadow-medium: rgba(0, 0, 0, 0.1);
+    --shadow-strong: rgba(0, 0, 0, 0.15);
+    --surface-2: #eef2f6;
+    --accent-muted: rgba(52, 152, 219, 0.28);
+    --accent-contrast: var(--secondary-bg);
+
+    --gradient-start: #2563eb;
+    --gradient-end: #9333ea;
+
+    /* Element Types */
+    --badge-iframe: #9b59b6;
+    --badge-shadow-host: #e67e22;
+    --badge-shadow-dom: #d35400;
+    --badge-svg: #16a085;
+    --badge-canvas: var(--danger);
+    --badge-cross-origin: var(--danger);
+    --badge-shadow-content: var(--warning);
+
+    /* Match Badges */
+    --match-none: var(--danger);
+    --match-single: var(--success);
+
+    /* Saved Item Badges */
+    --saved-badge-xpath-bg: #e3f2fd;
+    --saved-badge-xpath-text: #1565c0;
+    --saved-badge-css-bg: #e8f5e9;
+    --saved-badge-css-text: #2e7d32;
+    --saved-badge-id-bg: #fff3e0;
+    --saved-badge-id-text: #ef6c00;
+    --saved-badge-class-bg: #f3e5f5;
+    --saved-badge-class-text: #7b1fa2;
+    --saved-badge-manual-bg: #eceff1;
+    --saved-badge-manual-text: #546e7a;
+}
+
+body.dark-theme {
+    /* Semantic Palette - Dark Mode */
+    --success: #2ecc71;
+    --warning: #f1c40f;
+    --danger: #e74c3c;
+    --info: #8b5cf6; /* Indigo/Violet to match website */
+
+    /* Adjusted to match Website's Deep Midnight */
+    --primary-bg: #030712; 
+    --secondary-bg: #0f172a; 
+    --primary-text: #f8fafc;
+    --secondary-text: #94a3b8;
+    
+    --accent: var(--info);
+    --accent-rgb: 139, 92, 246; 
+    --accent-hover: #7c3aed; 
+    --border-light: #1e293b;
+    --border-dark: #334155;
+    --highlight: var(--warning);
+
+    --status-green: #2d5a37;
+    --status-green-text: #a8dadc;
+    --status-yellow: #6a5e00;
+    --status-yellow-text: #ffe066;
+    --status-red: #7c3a41;
+    --status-red-text: #f08080;
+
+    --shadow-light: rgba(0, 0, 0, 0.2);
+    --shadow-medium: rgba(0, 0, 0, 0.4);
+    --shadow-strong: rgba(0, 0, 0, 0.6);
+
+    --surface-2: #1e293b;
+    --accent-muted: rgba(var(--accent-rgb), 0.15);
+    --accent-contrast: #ffffff;
+
+    /* Match Badges - Overrides for better contrast on midnight */
+    --badge-iframe: #a855f7;
+    --badge-shadow-host: #f97316;
+}
+
+/* Global Styles */
+body {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    margin: 0;
+    padding: 0;
+    background-color: var(--primary-bg);
+    color: var(--primary-text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+/* Utility Classes */
+.hidden {
+    display: none !important;
+    opacity: 0;
+}
+
+/* Global Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--primary-bg);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-dark);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--secondary-text);
+}
+
+/* Drag & Drop Zone */
+.drop-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px;
+    border: 2px dashed var(--border-dark);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    background: var(--surface-1);
+    margin: 8px 0;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 80px;
+}
+
+.drop-zone:hover {
+    border-color: var(--accent);
+    background: var(--surface-2);
+}
+
+.drop-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-muted);
+    transform: scale(1.01);
+}
+
+.drop-icon {
+    font-size: 24px;
+    color: var(--accent);
+}
+
+.drop-text {
+    font-size: 11px;
+    color: var(--secondary-text);
+}
