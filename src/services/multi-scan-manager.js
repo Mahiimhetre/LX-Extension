@@ -61,6 +61,7 @@ class MultiScanManager {
             'playwright-js': {
                 find: [
                     { label: 'Locator', regex: 'page\\.locator\\s*\\(\\s*"([a-zA-Z-]+)=([^"]+)"\\s*\\)', template: 'page.locator("{type}={locator}")' },
+                    { label: 'Locator Generic', regex: '(?:page|\\.)(locator)\\s*\\(\\s*"((?![a-zA-Z-]+=[^"]+")[^"]+)"\\s*\\)', template: 'page.locator("{locator}")' },
                     { label: 'Role/Label', regex: 'page\\.getBy([a-zA-Z]+)\\s*\\(\\s*"([^"]+)"', template: 'page.getBy{type}("{locator}")' },
                     { label: 'Async Type', regex: 'await\\s+page\\.(?!locator|frameLocator|getBy)([a-zA-Z]+)\\s*\\(\\s*"([^"]+)"', template: 'await page.{type}("{locator}")' }
                 ],
@@ -68,12 +69,16 @@ class MultiScanManager {
             },
             'playwright-python': {
                 find: [
-                    { label: 'Locator', regex: 'page\\.locator\\s*\\(\\s*"([a-zA-Z-]+)=([^"]+)"\\s*\\)', template: 'page.locator("{type}={locator}")' }
+                    { label: 'Locator', regex: 'page\\.locator\\s*\\(\\s*"([a-zA-Z-]+)=([^"]+)"\\s*\\)', template: 'page.locator("{type}={locator}")' },
+                    { label: 'Locator Generic', regex: 'page\\.(locator)\\s*\\(\\s*"((?![a-zA-Z-]+=[^"]+")[^"]+)"\\s*\\)', template: 'page.locator("{locator}")' },
+                    { label: 'Action', regex: 'page\\.(?!locator)([a-zA-Z_]+)\\s*\\(\\s*"([^"]+)"\\s*\\)', template: 'page.{type}("{locator}")' }
                 ]
             },
             'playwright-java': {
                 find: [
-                    { label: 'Locator', regex: 'page\\.locator\\s*\\(\\s*"([a-zA-Z-]+)=([^"]+)"\\s*\\)', template: 'page.locator("{type}={locator}")' }
+                    { label: 'Locator', regex: 'page\\.locator\\s*\\(\\s*"([a-zA-Z-]+)=([^"]+)"\\s*\\)', template: 'page.locator("{type}={locator}")' },
+                    { label: 'Locator Generic', regex: 'page\\.(locator)\\s*\\(\\s*"((?![a-zA-Z-]+=[^"]+")[^"]+)"\\s*\\)', template: 'page.locator("{locator}")' },
+                    { label: 'Action', regex: 'page\\.(?!locator)([a-zA-Z_]+)\\s*\\(\\s*"([^"]+)"\\s*\\)', template: 'page.{type}("{locator}")' }
                 ]
             },
             'cypress': {
