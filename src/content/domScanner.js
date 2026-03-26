@@ -927,3 +927,10 @@ class DOMScanner {
 // Initialize scanner
 console.log('[Locator-X] DOMScanner script loaded');
 const domScanner = new DOMScanner();
+
+// Export for Node.js testing
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = DOMScanner;
+} else {
+    window.DOMScanner = DOMScanner;
+}
