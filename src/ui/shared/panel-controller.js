@@ -2009,7 +2009,7 @@ const LocatorX = {
             row.innerHTML = `
                 ${this._createMatchCell(matchCount, 'strategyMatchCount')}
                 <td class="strategy-cell">
-                    <select id="strategySelect">
+                    <select id="strategySelect" class="strategy-dropdown">
                         ${options}
                     </select>
                 </td>
@@ -2025,8 +2025,6 @@ const LocatorX = {
             if (select) {
                 select.addEventListener('change', (e) => {
                     const newType = e.target.value;
-                    // FIX: Use this.lastLocators to get the most up-to-date data
-                    // The 'allLocators' argument passed to this function is often stale (empty array from init)
                     const locators = this.lastLocators || [];
                     const newLocator = locators.find(l => l.type === newType);
                     this.updateGroupRow(row, newType, newLocator);
