@@ -858,16 +858,26 @@ class LocatorGenerator {
                 if (lowerStrategy === 'linktext') {
                     const links = this.querySelectorAllDeep('a', document, [], limit);
                     const target = selector.trim().toLowerCase();
-                    return Array.from(links).filter(link =>
-                        link.textContent.trim().toLowerCase() === target
-                    ).length;
+                    let count = 0;
+                    for (let i = 0; i < links.length; i++) {
+                        if (links[i].textContent.trim().toLowerCase() === target) {
+                            count++;
+                            if (count >= limit) break;
+                        }
+                    }
+                    return count;
                 }
                 if (lowerStrategy === 'partiallinktext') {
                     const links = this.querySelectorAllDeep('a', document, [], limit);
                     const target = selector.trim().toLowerCase();
-                    return Array.from(links).filter(link =>
-                        link.textContent.toLowerCase().includes(target)
-                    ).length;
+                    let count = 0;
+                    for (let i = 0; i < links.length; i++) {
+                        if (links[i].textContent.toLowerCase().includes(target)) {
+                            count++;
+                            if (count >= limit) break;
+                        }
+                    }
+                    return count;
                 }
                 if (lowerStrategy === 'jspath') {
                     try {
