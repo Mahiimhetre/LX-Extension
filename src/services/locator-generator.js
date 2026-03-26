@@ -871,8 +871,12 @@ class LocatorGenerator {
                 }
                 if (lowerStrategy === 'jspath') {
                     try {
-                        const res = eval(selector);
-                        return res ? (res.length || 1) : 0;
+                        // Extract CSS selector from document.querySelector('...') or document.querySelectorAll('...')
+                        const match = selector.match(/document\.querySelector(?:All)?\(['"](.*)['"]\)/);
+                        if (match && match[1]) {
+                            return this.querySelectorAllDeep(match[1], document, [], limit).length;
+                        }
+                        return 0;
                     } catch (e) { return 0; }
                 }
                 if (lowerStrategy === 'jquery') {
