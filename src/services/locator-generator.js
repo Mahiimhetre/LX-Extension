@@ -1145,12 +1145,15 @@ class LocatorGenerator {
     }
 
     levenshtein(a, b) {
+        const aLen = a.length;
+        const bLen = b.length;
         const matrix = [];
-        for (let i = 0; i <= b.length; i++) matrix[i] = [i];
-        for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
-        for (let i = 1; i <= b.length; i++) {
-            for (let j = 1; j <= a.length; j++) {
-                if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        for (let i = 0; i <= bLen; i++) matrix[i] = [i];
+        for (let j = 0; j <= aLen; j++) matrix[0][j] = j;
+        for (let i = 1; i <= bLen; i++) {
+            const bChar = b.charAt(i - 1);
+            for (let j = 1; j <= aLen; j++) {
+                if (bChar === a.charAt(j - 1)) {
                     matrix[i][j] = matrix[i - 1][j - 1];
                 } else {
                     matrix[i][j] = Math.min(
@@ -1161,7 +1164,7 @@ class LocatorGenerator {
                 }
             }
         }
-        return matrix[b.length][a.length];
+        return matrix[bLen][aLen];
     }
 }
 
