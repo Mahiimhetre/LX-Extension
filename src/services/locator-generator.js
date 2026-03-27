@@ -1155,6 +1155,62 @@ class LocatorGenerator {
             if (count > 0) suggestion = matches[0].tagName.toLowerCase();
         }
 
+        // --- CSS & XPath Healing ---
+        else if (lowerStrategy === 'css' || lowerStrategy.includes('xpath')) {
+            // Simplified heuristics for auto-healing broken CSS/XPath syntax
+            // For CSS: Look for ID or Class that might be misspelled
+            if (lowerStrategy === 'css' && (selector.startsWith('#') || selector.startsWith('.'))) {
+                const isId = selector.startsWith('#');
+                const cleanTarget = clean(selector.substring(1));
+                const elements = this.querySelectorAllDeep(isId ? '[id]' : '[class]');
+                const matches = Array.from(elements).filter(el => {
+                    const val = isId ? el.id : (el.getAttribute('class') || '');
+                    if (!val) return false;
+                    if (isId) {
+                        return this.levenshtein(clean(val), cleanTarget) <= Math.max(1, Math.floor(cleanTarget.length / 4));
+                    } else {
+                        return val.split(/\s+/).some(cls => this.levenshtein(clean(cls), cleanTarget) <= Math.max(1, Math.floor(cleanTarget.length / 4)));
+                    }
+                });
+
+                count = matches.length;
+                if (count > 0) {
+                    const matchedEl = matches[0];
+                    if (isId) {
+                        suggestion = '#' + matchedEl.id;
+                    } else {
+                        const classes = (matchedEl.getAttribute('class') || '').split(/\s+/);
+                        const matchedClass = classes.find(cls => this.levenshtein(clean(cls), cleanTarget) <= Math.max(1, Math.floor(cleanTarget.length / 4)));
+                        if (matchedClass) suggestion = '.' + matchedClass;
+                    }
+                }
+            }
+            // For XPath: Extract attribute value e.g., //tag[@id='broken']
+            else if (lowerStrategy.includes('xpath') && selector.includes('[@')) {
+                const match = selector.match(/\[@([a-zA-Z0-9_-]+)=['"](.*?)['"]\]/);
+                if (match) {
+                    const attrName = match[1];
+                    const attrValue = clean(match[2]);
+                    const tagMatch = selector.match(/\/\/([a-zA-Z0-9]+)\[/);
+                    const tag = tagMatch ? tagMatch[1] : '*';
+
+                    const elements = this.querySelectorAllDeep(tag);
+                    const matches = Array.from(elements).filter(el => {
+                        const val = el.getAttribute(attrName);
+                        if (!val) return false;
+                        return this.levenshtein(clean(val), attrValue) <= Math.max(1, Math.floor(attrValue.length / 4));
+                    });
+
+                    count = matches.length;
+                    if (count > 0) {
+                        const matchedEl = matches[0];
+                        const realVal = matchedEl.getAttribute(attrName);
+                        suggestion = selector.replace(match[2], realVal);
+                    }
+                }
+            }
+        }
+
         return { count, suggestion };
     }
 
