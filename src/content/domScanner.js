@@ -88,9 +88,7 @@ class DOMScanner {
                 try {
                     const maxCap = (typeof LocatorXConfig !== 'undefined') ? LocatorXConfig.LIMITS.MAX_MATCH_DEFAULT : 500;
                     const limit = Math.min(message.maxMatchLimit || this.maxMatchLimit || 150, maxCap);
-                    console.log('[DOMScanner] evaluateSelector request:', message.selector, message.type, 'Limit:', limit);
                     const results = this.evaluateSelector(message.selector, message.type, message.enableSmartCorrect, limit);
-                    console.log('[DOMScanner] evaluateSelector results:', results);
                     sendResponse(results);
                 } catch (e) {
                     console.error('[DOMScanner] evaluateSelector error:', e);
@@ -488,7 +486,6 @@ class DOMScanner {
                     el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
                 } else {
                     // Highlight ALL (Default behavior)
-                    console.log(`[Locator-X] Highlighting ${matches.length} matches`);
                     const firstMatch = matches[0];
                     if (firstMatch.scrollIntoView) {
                         firstMatch.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
@@ -925,5 +922,4 @@ class DOMScanner {
 }
 
 // Initialize scanner
-console.log('[Locator-X] DOMScanner script loaded');
 const domScanner = new DOMScanner();
