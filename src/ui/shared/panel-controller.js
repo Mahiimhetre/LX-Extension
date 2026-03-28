@@ -517,8 +517,8 @@ const LocatorX = {
 
                 // Actions Column
                 row.innerHTML += `<td>
-                        <i class="bi-clipboard" title="Copy"></i>
-                        <i class="bi-trash" title="Delete"></i>
+                        <i class="bi-clipboard" title="Copy" role="button" aria-label="Copy" tabindex="0"></i>
+                        <i class="bi-trash" title="Delete" role="button" aria-label="Delete" tabindex="0"></i>
                     </td>
                 `;
 
@@ -578,6 +578,23 @@ const LocatorX = {
     },
 
     // Tab Management
+    accessibility: {
+        init() {
+            // Make any element with role="button" and tabindex="0" clickable via Enter or Space
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    const activeElement = document.activeElement;
+                    if (activeElement && activeElement.getAttribute('role') === 'button' && activeElement.getAttribute('tabindex') === '0') {
+                        if (!activeElement.classList.contains('disabled') && activeElement.getAttribute('aria-disabled') !== 'true') {
+                            e.preventDefault();
+                            activeElement.click();
+                        }
+                    }
+                }
+            });
+        }
+    },
+
     tabs: {
         current: 'home',
 
@@ -1162,7 +1179,7 @@ const LocatorX = {
                     <td class="lx-editable ms-type-cell">${type}</td>
                     <td class="lx-editable">${locator}</td>
                     <td>
-                        <i class="bi-clipboard ms-copy-icon" title="Copy"></i>
+                        <i class="bi-clipboard ms-copy-icon" title="Copy" role="button" aria-label="Copy" tabindex="0"></i>
                     </td>
                 `;
                 tbody.appendChild(row);
@@ -1827,8 +1844,8 @@ const LocatorX = {
                     <td class="lx-editable" data-target="table-cell" style="color: var(--secondary-text); opacity: 0.5;"></td>
                     <td class="time-column ${this.showTimestamp ? '' : 'hidden'}">-</td>
                     <td>
-                        <i class="bi-clipboard disabled" title="Copy"></i>
-                        <i class="bi-bookmark-plus disabled" title="Save"></i>
+                        <i class="bi-clipboard disabled" title="Copy" role="button" aria-label="Copy" aria-disabled="true" tabindex="-1"></i>
+                        <i class="bi-bookmark-plus disabled" title="Save" role="button" aria-label="Save" aria-disabled="true" tabindex="-1"></i>
                     </td>
                     `;
                 tbody.appendChild(row);
@@ -2132,10 +2149,11 @@ const LocatorX = {
 
         _createActionCell(isDisabled) {
             const cls = isDisabled ? 'disabled' : '';
+            const ariaDisabled = isDisabled ? 'aria-disabled="true" tabindex="-1"' : 'tabindex="0"';
             return `
     <td >
-                    <i class="bi-clipboard ${cls}" title="Copy"></i>
-                    <i class="bi-bookmark-plus ${cls}" title="Save"></i>
+                    <i class="bi-clipboard ${cls}" title="Copy" role="button" aria-label="Copy" ${ariaDisabled}></i>
+                    <i class="bi-bookmark-plus ${cls}" title="Save" role="button" aria-label="Save" ${ariaDisabled}></i>
                 </td >
     `;
         },
@@ -3371,6 +3389,7 @@ const LocatorX = {
         this.tabs.init();
         this.theme.init();
         this.dropdowns.init();
+        this.accessibility.init();
 
         if (typeof planService !== 'undefined') { planService.applyUIGates(); } // Initialize features early to apply gates
 
@@ -3440,8 +3459,8 @@ const LocatorX = {
                                     <span class="saved-type-badge ${typeClass}">${item.type}</span>
                                 </div>
                                 <div class="saved-actions">
-                                    <i class="bi-clipboard header-icon-button saved-copy" title="Copy Locator" style="font-size: 12px; margin: 0 2px;"></i>
-                                    <i class="bi-trash header-icon-button saved-delete" title="Delete" style="font-size: 12px; margin: 0 2px;"></i>
+                                    <i class="bi-clipboard header-icon-button saved-copy" title="Copy Locator" style="font-size: 12px; margin: 0 2px;" role="button" aria-label="Copy Locator" tabindex="0"></i>
+                                    <i class="bi-trash header-icon-button saved-delete" title="Delete" style="font-size: 12px; margin: 0 2px;" role="button" aria-label="Delete Locator" tabindex="0"></i>
                                 </div>
                             </div>
                             <div class="saved-locator-code" title="${item.locator}">${item.locator}</div>

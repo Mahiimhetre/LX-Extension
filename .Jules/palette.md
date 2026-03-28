@@ -1,0 +1,3 @@
+## 2024-03-28 - Accessible Custom Icon Buttons
+**Learning:** When using `<i>` or `<li>` tags as buttons (common with Bootstrap Icons like `<i class="bi-icon"></i>`), adding `role="button"`, `aria-label="Action"`, and `tabindex="0"` makes them discoverable by screen readers and focusable. However, they lack native keyboard activation.
+**Action:** Always implement a global `keydown` event listener for 'Enter' and 'Space' that triggers `activeElement.click()` on these custom elements, ensuring `e.preventDefault()` is called to prevent page scrolling on 'Space', and checking that the element is not disabled (`.disabled` class or `aria-disabled="true"`).
