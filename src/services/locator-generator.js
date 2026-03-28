@@ -1214,27 +1214,62 @@ class LocatorGenerator {
         return { count, suggestion };
     }
 
+    // Optimized 1D Levenshtein distance: O(min(N,M)) memory and faster execution
     levenshtein(a, b) {
-        const aLen = a.length;
-        const bLen = b.length;
-        const matrix = [];
-        for (let i = 0; i <= bLen; i++) matrix[i] = [i];
-        for (let j = 0; j <= aLen; j++) matrix[0][j] = j;
-        for (let i = 1; i <= bLen; i++) {
-            const bChar = b.charAt(i - 1);
-            for (let j = 1; j <= aLen; j++) {
-                if (bChar === a.charAt(j - 1)) {
-                    matrix[i][j] = matrix[i - 1][j - 1];
-                } else {
-                    matrix[i][j] = Math.min(
-                        matrix[i - 1][j - 1] + 1,
-                        matrix[i][j - 1] + 1,
-                        matrix[i - 1][j] + 1
-                    );
-                }
-            }
+        if (a === b) return 0;
+        if (a.length === 0) return b.length;
+        if (b.length === 0) return a.length;
+
+        if (a.length > b.length) {
+            const tmp = a;
+            a = b;
+            b = tmp;
         }
-        return matrix[bLen][aLen];
+
+        let aLen = a.length;
+        let bLen = b.length;
+
+        // Trim common prefix
+        let start = 0;
+        while (start < aLen && a.charCodeAt(start) === b.charCodeAt(start)) {
+            start++;
+        }
+
+        if (start > 0) {
+            aLen -= start;
+            bLen -= start;
+            if (aLen === 0) return bLen;
+        }
+
+        // Trim common suffix
+        while (aLen > 0 && a.charCodeAt(start + aLen - 1) === b.charCodeAt(start + bLen - 1)) {
+            aLen--;
+            bLen--;
+        }
+        if (aLen === 0) return bLen;
+
+        const row = new Array(aLen + 1);
+        for (let i = 0; i <= aLen; i++) {
+            row[i] = i;
+        }
+
+        for (let i = 1; i <= bLen; i++) {
+            let prev = i;
+            let current;
+            let bCharCode = b.charCodeAt(start + i - 1);
+
+            for (let j = 1; j <= aLen; j++) {
+                if (bCharCode === a.charCodeAt(start + j - 1)) {
+                    current = row[j - 1];
+                } else {
+                    current = Math.min(row[j - 1], prev, row[j]) + 1;
+                }
+                row[j - 1] = prev;
+                prev = current;
+            }
+            row[aLen] = prev;
+        }
+        return row[aLen];
     }
 }
 
