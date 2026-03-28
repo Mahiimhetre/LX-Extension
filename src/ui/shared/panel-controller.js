@@ -87,6 +87,16 @@ const LocatorX = {
 
 
     utils: {
+        escapeHtml(unsafe) {
+            if (typeof unsafe !== 'string') return unsafe;
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        },
+
         async copyToClipboard(text) {
             try {
                 if (navigator.clipboard && window.isSecureContext) {
@@ -2792,7 +2802,7 @@ const LocatorX = {
                         <div class="match-count" style="background:none; color:#ffc107;">⚡</div>
                         <span class="item-text" style="flex: 1; min-width: 0;">
                             <span style="opacity:0.7">Did you mean:</span> 
-                            <strong>${suggestedLocator}</strong>
+                            <strong>${LocatorX.utils.escapeHtml(suggestedLocator)}</strong>
                         </span>
                     </div>
                 `;
@@ -2822,7 +2832,7 @@ const LocatorX = {
                 liveItem.innerHTML = `
                     <div class="dropdown-item-wrapper" style="display: flex; align-items: center; width: 100%; gap: 8px;">
                         <div class="match-count" data-count="${countVal}">${countVal}</div>
-                        <span class="item-text" style="flex: 1; min-width: 0;"><strong>${query}</strong></span>
+                        <span class="item-text" style="flex: 1; min-width: 0;"><strong>${LocatorX.utils.escapeHtml(query)}</strong></span>
                     </div>
                 `;
                 liveItem.addEventListener('click', () => {
@@ -2842,11 +2852,11 @@ const LocatorX = {
 
                 let html = '';
                 if (queryIndex >= 0) {
-                    html = text.substring(0, queryIndex) +
-                        '<strong>' + text.substring(queryIndex, queryIndex + query.length) + '</strong>' +
-                        text.substring(queryIndex + query.length);
+                    html = LocatorX.utils.escapeHtml(text.substring(0, queryIndex)) +
+                        '<strong>' + LocatorX.utils.escapeHtml(text.substring(queryIndex, queryIndex + query.length)) + '</strong>' +
+                        LocatorX.utils.escapeHtml(text.substring(queryIndex + query.length));
                 } else {
-                    html = text;
+                    html = LocatorX.utils.escapeHtml(text);
                 }
 
                 // Show match count BEFORE the locator as requested
