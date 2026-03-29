@@ -1068,21 +1068,31 @@ class LocatorGenerator {
         // --- Link Text & Partial Link Text ---
         if (lowerStrategy === 'linktext' || lowerStrategy === 'partiallinktext') {
             const links = this.querySelectorAllDeep('a');
-            const matches = Array.from(links).filter(link => {
+
+            // ⚡ Bolt: Iterate over NodeList with for-loop instead of Array.from().filter()
+            // This prevents massive O(N) memory allocation and allows early loop termination
+            // when maxCap is reached, improving performance significantly on large DOMs.
+            const matches = [];
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
                 const cleanLink = clean(link.textContent);
+                let isMatch = false;
 
                 // Direct Fuzzy Match (Case/Space)
-                if (lowerStrategy === 'linktext' && cleanLink === target) return true;
-                if (lowerStrategy === 'partiallinktext' && cleanLink.includes(target)) return true;
-
+                if (lowerStrategy === 'linktext' && cleanLink === target) isMatch = true;
+                else if (lowerStrategy === 'partiallinktext' && cleanLink.includes(target)) isMatch = true;
                 // Spelling Check (Levenshtein) - ONLY for explicit Link Text
-                if (lowerStrategy === 'linktext' && Math.abs(cleanLink.length - target.length) < 4) {
+                else if (lowerStrategy === 'linktext' && Math.abs(cleanLink.length - target.length) < 4) {
                     const dist = this.levenshtein(cleanLink, target);
                     const threshold = Math.max(1, Math.min(3, Math.floor(target.length / 4)));
-                    return dist <= threshold;
+                    if (dist <= threshold) isMatch = true;
                 }
-                return false;
-            });
+
+                if (isMatch) {
+                    matches.push(link);
+                    if (matches.length >= maxCap) break;
+                }
+            }
             count = matches.length;
             if (count > 0) suggestion = matches[0].textContent.trim();
         }
@@ -1091,12 +1101,21 @@ class LocatorGenerator {
         else if (lowerStrategy === 'id') {
             // Try to find ANY element with an ID that is fuzzily close
             const elements = this.querySelectorAllDeep('[id]');
-            const matches = Array.from(elements).filter(el => {
+            const matches = [];
+            for (let i = 0; i < elements.length; i++) {
+                const el = elements[i];
                 const cleanId = clean(el.id);
-                if (cleanId === target) return true; // Case/Space match
-                const dist = this.levenshtein(cleanId, target);
-                return dist <= Math.max(1, Math.min(3, Math.floor(target.length / 4)));
-            });
+                let isMatch = false;
+                if (cleanId === target) isMatch = true; // Case/Space match
+                else {
+                    const dist = this.levenshtein(cleanId, target);
+                    if (dist <= Math.max(1, Math.min(3, Math.floor(target.length / 4)))) isMatch = true;
+                }
+                if (isMatch) {
+                    matches.push(el);
+                    if (matches.length >= maxCap) break;
+                }
+            }
             count = matches.length;
             if (count > 0) suggestion = matches[0].id;
         }
@@ -1104,12 +1123,21 @@ class LocatorGenerator {
         // --- Name ---
         else if (lowerStrategy === 'name') {
             const elements = this.querySelectorAllDeep('[name]');
-            const matches = Array.from(elements).filter(el => {
+            const matches = [];
+            for (let i = 0; i < elements.length; i++) {
+                const el = elements[i];
                 const cleanName = clean(el.getAttribute('name'));
-                if (cleanName === target) return true;
-                const dist = this.levenshtein(cleanName, target);
-                return dist <= Math.max(1, Math.min(3, Math.floor(target.length / 4)));
-            });
+                let isMatch = false;
+                if (cleanName === target) isMatch = true;
+                else {
+                    const dist = this.levenshtein(cleanName, target);
+                    if (dist <= Math.max(1, Math.min(3, Math.floor(target.length / 4)))) isMatch = true;
+                }
+                if (isMatch) {
+                    matches.push(el);
+                    if (matches.length >= maxCap) break;
+                }
+            }
             count = matches.length;
             if (count > 0) suggestion = matches[0].getAttribute('name');
         }
@@ -1117,15 +1145,21 @@ class LocatorGenerator {
         // --- ClassName ---
         else if (lowerStrategy === 'classname') {
             const elements = this.querySelectorAllDeep('[class]');
-            const matches = Array.from(elements).filter(el => {
+            const matches = [];
+            for (let i = 0; i < elements.length; i++) {
+                const el = elements[i];
                 const classes = (el.getAttribute('class') || '').split(/\s+/);
-                return classes.some(cls => {
+                const isMatch = classes.some(cls => {
                     const cleanCls = clean(cls);
                     if (cleanCls === target) return true;
                     const dist = this.levenshtein(cleanCls, target);
                     return dist <= Math.max(1, Math.min(3, Math.floor(target.length / 4)));
                 });
-            });
+                if (isMatch) {
+                    matches.push(el);
+                    if (matches.length >= maxCap) break;
+                }
+            }
             count = matches.length;
             // Note: ClassName suggestion is tricky because multiple elements might match different fuzzy classes.
             // We'll return the first confident match.
@@ -1145,12 +1179,21 @@ class LocatorGenerator {
         // --- TagName ---
         else if (lowerStrategy === 'tagname') {
             const elements = this.querySelectorAllDeep('*');
-            const matches = Array.from(elements).filter(el => {
+            const matches = [];
+            for (let i = 0; i < elements.length; i++) {
+                const el = elements[i];
                 const cleanTag = clean(el.tagName);
-                if (cleanTag === target) return true;
-                const dist = this.levenshtein(cleanTag, target);
-                return dist <= 1; // Strict threshold for tags (div vs dav)
-            });
+                let isMatch = false;
+                if (cleanTag === target) isMatch = true;
+                else {
+                    const dist = this.levenshtein(cleanTag, target);
+                    if (dist <= 1) isMatch = true; // Strict threshold for tags (div vs dav)
+                }
+                if (isMatch) {
+                    matches.push(el);
+                    if (matches.length >= maxCap) break;
+                }
+            }
             count = matches.length;
             if (count > 0) suggestion = matches[0].tagName.toLowerCase();
         }
@@ -1163,15 +1206,22 @@ class LocatorGenerator {
                 const isId = selector.startsWith('#');
                 const cleanTarget = clean(selector.substring(1));
                 const elements = this.querySelectorAllDeep(isId ? '[id]' : '[class]');
-                const matches = Array.from(elements).filter(el => {
+                const matches = [];
+                for (let i = 0; i < elements.length; i++) {
+                    const el = elements[i];
                     const val = isId ? el.id : (el.getAttribute('class') || '');
-                    if (!val) return false;
+                    if (!val) continue;
+                    let isMatch = false;
                     if (isId) {
-                        return this.levenshtein(clean(val), cleanTarget) <= Math.max(1, Math.floor(cleanTarget.length / 4));
+                        if (this.levenshtein(clean(val), cleanTarget) <= Math.max(1, Math.floor(cleanTarget.length / 4))) isMatch = true;
                     } else {
-                        return val.split(/\s+/).some(cls => this.levenshtein(clean(cls), cleanTarget) <= Math.max(1, Math.floor(cleanTarget.length / 4)));
+                        if (val.split(/\s+/).some(cls => this.levenshtein(clean(cls), cleanTarget) <= Math.max(1, Math.floor(cleanTarget.length / 4)))) isMatch = true;
                     }
-                });
+                    if (isMatch) {
+                        matches.push(el);
+                        if (matches.length >= maxCap) break;
+                    }
+                }
 
                 count = matches.length;
                 if (count > 0) {
@@ -1195,11 +1245,16 @@ class LocatorGenerator {
                     const tag = tagMatch ? tagMatch[1] : '*';
 
                     const elements = this.querySelectorAllDeep(tag);
-                    const matches = Array.from(elements).filter(el => {
+                    const matches = [];
+                    for (let i = 0; i < elements.length; i++) {
+                        const el = elements[i];
                         const val = el.getAttribute(attrName);
-                        if (!val) return false;
-                        return this.levenshtein(clean(val), attrValue) <= Math.max(1, Math.floor(attrValue.length / 4));
-                    });
+                        if (!val) continue;
+                        if (this.levenshtein(clean(val), attrValue) <= Math.max(1, Math.floor(attrValue.length / 4))) {
+                            matches.push(el);
+                            if (matches.length >= maxCap) break;
+                        }
+                    }
 
                     count = matches.length;
                     if (count > 0) {
