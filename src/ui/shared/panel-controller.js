@@ -86,6 +86,23 @@ const LocatorX = {
 
 
 
+    accessibility: {
+        init() {
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    const el = document.activeElement;
+                    if (el &&
+                        (el.getAttribute('role') === 'button' || el.tagName === 'I' || el.tagName === 'LI') &&
+                        !el.classList.contains('disabled') &&
+                        el.getAttribute('aria-disabled') !== 'true') {
+                        e.preventDefault();
+                        el.click();
+                    }
+                }
+            });
+        }
+    },
+
     utils: {
         escapeHtml(unsafe) {
             if (typeof unsafe !== 'string') return unsafe;
@@ -3394,6 +3411,7 @@ const LocatorX = {
         this.savedLocators.init();
         this.inspect.init();
 
+        this.accessibility.init();
         this.auth.init();
         this.conflict.init();
 

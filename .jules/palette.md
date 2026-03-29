@@ -1,0 +1,3 @@
+## 2024-03-29 - Missing Accessibility on Icon Buttons
+**Learning:** This extension's UI components, specifically the `.header-icon-button`, `.clear-btn`, `.action-btn`, `.nav-btn`, and `.login-btn` icon elements (`<i>`), were primarily lacking proper accessibility semantics for keyboard users and screen readers. Because they weren't wrapped in `<button>` elements, they did not inherently receive focus or broadcast their role as interactive elements.
+**Action:** When adding or modifying custom icon-only actions (like `<i class="...">`), I must ensure they include `role="button"`, `tabindex="0"`, and `aria-label` where context is missing, and verify the `LocatorX.accessibility.init()` logic allows keyboard activation.
