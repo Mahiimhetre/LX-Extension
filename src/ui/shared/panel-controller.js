@@ -475,7 +475,7 @@ const LocatorX = {
                     const val = matching ? matching.locator : '-';
                     // Add distinct style for empty
                     const style = matching ? '' : 'color: var(--secondary-text); opacity: 0.5;';
-                    row.innerHTML += `<td class="lx-editable" data-target="pom-cell" data-locator-type="${type}" style="${style}">${val}</td>`;
+                    row.innerHTML += `<td class="lx-editable" data-target="pom-cell" data-locator-type="${type}" style="${style}">${LocatorX.utils.escapeHtml(val)}</td>`;
                 });
 
                 // Render Grouped Column (Relative XPath) if needed
@@ -502,7 +502,7 @@ const LocatorX = {
                             const loc = elementLocators.find(l => l.type === type);
                             const val = loc ? loc.locator : '-';
                             const isDisabled = !loc;
-                            return `<option value="${type}" data-locator="${val}" ${type === preferredType ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}>${type}</option>`;
+                            return `<option value="${type}" data-locator="${LocatorX.utils.escapeHtml(val)}" ${type === preferredType ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}>${type}</option>`;
                         }).join('');
 
                         row.innerHTML += `
@@ -511,7 +511,7 @@ const LocatorX = {
                                      <select class="strategy-select">
                                         ${options}
                                      </select>
-                                     <div class="strategy-value lx-editable" data-target="pom-cell" data-is-strategy="true" style="${valStyle}">${preferredValue}</div>
+                                     <div class="strategy-value lx-editable" data-target="pom-cell" data-is-strategy="true" style="${valStyle}">${LocatorX.utils.escapeHtml(preferredValue)}</div>
                                 </div>
                             </td>`;
                     } else {
@@ -1170,7 +1170,7 @@ const LocatorX = {
                     <td>${index + 1}</td>
                     <td><span class="match-count" id="${matchId}" data-count="..."></span></td>
                     <td class="lx-editable ms-type-cell">${type}</td>
-                    <td class="lx-editable">${locator}</td>
+                    <td class="lx-editable">${LocatorX.utils.escapeHtml(locator)}</td>
                     <td>
                         <i class="bi-clipboard ms-copy-icon" title="Copy"></i>
                     </td>
@@ -1898,7 +1898,7 @@ const LocatorX = {
                     matchCell.textContent = locator.matches;
 
                     const displayValue = this.formatLocator(locator.locator, type);
-                    valCell.innerHTML = `<span class="locator-wrapper"> <span class="locator-text">${displayValue}</span>${this._createWarningIcon(locator.warnings)}</span > `;
+                    valCell.innerHTML = `<span class="locator-wrapper"> <span class="locator-text">${LocatorX.utils.escapeHtml(displayValue)}</span>${this._createWarningIcon(locator.warnings)}</span > `;
                     valCell.title = locator.locator; // Tooltip shows raw
 
                     valCell.classList.add('locator-cell');
@@ -1971,7 +1971,7 @@ const LocatorX = {
                     <td>${locator.type}</td>
                     <td class="lx-editable locator-cell" data-target="table-cell">
                         <span class="locator-wrapper">
-                            <span class="locator-text">${locator.locator}</span>
+                            <span class="locator-text">${LocatorX.utils.escapeHtml(locator.locator)}</span>
                             ${this._createWarningIcon(locator.warnings)}
                         </span>
                     </td>
@@ -2011,7 +2011,7 @@ const LocatorX = {
                 return `<option value = "${type}" ${type === currentType ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}> ${type}</option > `;
             }).join('');
 
-            const locatorValue = locator ? `<span class="locator-wrapper"> <span class="locator-text">${locator.locator}</span>${this._createWarningIcon(locator.warnings)}</span > ` : '-';
+            const locatorValue = locator ? `<span class="locator-wrapper"> <span class="locator-text">${LocatorX.utils.escapeHtml(locator.locator)}</span>${this._createWarningIcon(locator.warnings)}</span > ` : '-';
             const locatorStyle = locator ? '' : '';
             const locatorClass = locator ? 'locator-cell' : 'lx-text-disabled';
             const actionClass = locator ? '' : 'disabled';
@@ -2052,7 +2052,7 @@ const LocatorX = {
                 matchBadge.textContent = locator.matches;
 
                 const displayValue = this.formatLocator(locator.locator, type);
-                locatorCell.innerHTML = `<span class="locator-wrapper"> <span class="locator-text">${displayValue}</span>${this._createWarningIcon(locator.warnings)}</span > `;
+                locatorCell.innerHTML = `<span class="locator-wrapper"> <span class="locator-text">${LocatorX.utils.escapeHtml(displayValue)}</span>${this._createWarningIcon(locator.warnings)}</span > `;
 
                 // Store raw locator for copy/save actions if needed, or we copy formatted? 
                 // Usually user wants to copy the code.
