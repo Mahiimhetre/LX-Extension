@@ -23,12 +23,12 @@
     <div class="container">
         <header class="header">
             <i class="bi-arrow-up-left-circle inspect-button header-icon-button" id="inspectBtn"
-                title="Inspect Elements"></i>
+                title="Inspect Elements" role="button" aria-label="Inspect Elements" tabindex="0"></i>
             <div class="header-actions">
                 <i class="bi-bug header-icon-button" id="freezeBtn" title="Freeze Page (Requires DevTools F12)"
-                    data-feature="module.debugger"></i>
+                    data-feature="module.debugger" role="button" aria-label="Freeze Page" tabindex="0"></i>
                 <i class="bi-circle-half theme-button header-icon-button" id="themeBtn" title="Change theme"
-                    data-feature="ui.theme.dark"></i>
+                    data-feature="ui.theme.dark" role="button" aria-label="Change theme" tabindex="0"></i>
             </div>
             <div class="header-content">
                 <div class="title-block">
@@ -288,9 +288,9 @@
                         </select>
                     </div>
                     <div class="pom-actions">
-                        <i class="bi-plus-circle-dotted action-btn" id="addPageBtn" title="New Page"></i>
-                        <i class="bi-pencil action-btn" id="editPageBtn" title="Rename Page"></i>
-                        <i class="bi-trash action-btn" id="deletePageBtn" title="Delete Page"></i>
+                        <i class="bi-plus-circle-dotted action-btn" id="addPageBtn" title="New Page" role="button" aria-label="New Page" tabindex="0"></i>
+                        <i class="bi-pencil action-btn" id="editPageBtn" title="Rename Page" role="button" aria-label="Rename Page" tabindex="0"></i>
+                        <i class="bi-trash action-btn" id="deletePageBtn" title="Delete Page" role="button" aria-label="Delete Page" tabindex="0"></i>
                     </div>
                 </div>
                 <div class="table-container">
@@ -359,7 +359,7 @@
     <footer class="footer">
         <div class="footer-content">
             <div class="auth-container">
-                <i class="bi-person-circle login-btn header-icon-button" id="loginBtn" title="Login"></i>
+                <i class="bi-person-circle login-btn header-icon-button" id="loginBtn" title="Login" role="button" aria-label="Login" tabindex="0"></i>
                 <div id="userProfile" class="user-profile hidden">
                     <!-- Trigger -->
                     <div id="userDropdownTrigger"

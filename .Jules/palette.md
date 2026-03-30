@@ -1,0 +1,3 @@
+## 2024-03-30 - Add ARIA Roles and Labels to Icon-only Interactive Tags
+ **Learning:** In LocatorX, custom icon buttons (using `<i>` or `<li>` tags) require `role="button"`, `aria-label`, and `tabindex="0"` for accessibility. Global keyboard activation (Enter/Space) is handled by `LocatorX.accessibility.init()`.
+ **Action:** Always include `role="button"`, `aria-label`, and `tabindex="0"` attributes on these elements for keyboard accessibility.
