@@ -3369,8 +3369,28 @@ const LocatorX = {
         }
     },
 
+    accessibility: {
+        init() {
+            // Global Keyboard Activation (Enter/Space)
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    const activeEl = document.activeElement;
+                    if (activeEl && (activeEl.getAttribute('role') === 'button' || activeEl.hasAttribute('tabindex'))) {
+                        // Exclude actual buttons or inputs which natively handle this
+                        const tag = activeEl.tagName.toLowerCase();
+                        if (tag !== 'button' && tag !== 'input' && tag !== 'textarea' && tag !== 'select') {
+                            e.preventDefault(); // Prevent scrolling on Space
+                            activeEl.click();
+                        }
+                    }
+                }
+            });
+        }
+    },
+
     // Initialize all modules
     async init() {
+        this.accessibility.init();
         this.modal = new LocatorXModal();
         this.core = new LocatorXCore();
         this.evaluator = new Evaluator();

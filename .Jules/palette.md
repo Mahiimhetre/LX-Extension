@@ -1,0 +1,3 @@
+## 2024-05-18 - [Accessibility attributes for Icon buttons]
+**Learning:** [UX/a11y insight] Found multiple custom buttons that used standard tags like `<i>` or `<li>` and relied only on `onclick` handlers, without necessary attributes like `tabindex`, `role="button"` or `aria-label`. They also lacked global keyboard activation via Space or Enter keys, hurting accessibility.
+**Action:** [How to apply next time] For interactive non-button elements, ensure semantic markup by baking in `tabindex="0"`, `role="button"` and meaningful `aria-label`s directly in the HTML. Combine with a single, global event listener mapped on standard keydown events (Enter/Space) to gracefully trigger `click()` actions. Use specific tags for interactive elements and avoid DOM monkey-patching.
