@@ -1046,6 +1046,19 @@ class LocatorGenerator {
         return null;
     }
 
+    // Performance optimized filter for NodeLists avoiding Array.from and respecting finalLimit
+    _fuzzyFilter(elements, finalLimit, matchFn) {
+        const matches = [];
+        for (let i = 0; i < elements.length; i++) {
+            if (matches.length >= finalLimit) break;
+            const el = elements[i];
+            if (matchFn(el)) {
+                matches.push(el);
+            }
+        }
+        return matches;
+    }
+
     validateLocator(selector, strategy, shouldFuzzyMatch = false, limit = 150) {
         // Enforce hard cap
         const maxCap = (typeof LocatorXConfig !== 'undefined') ? LocatorXConfig.LIMITS.MAX_MATCH_DEFAULT : 500;
@@ -1068,7 +1081,7 @@ class LocatorGenerator {
         // --- Link Text & Partial Link Text ---
         if (lowerStrategy === 'linktext' || lowerStrategy === 'partiallinktext') {
             const links = this.querySelectorAllDeep('a');
-            const matches = Array.from(links).filter(link => {
+            const matches = this._fuzzyFilter(links, finalLimit, link => {
                 const cleanLink = clean(link.textContent);
 
                 // Direct Fuzzy Match (Case/Space)
@@ -1091,7 +1104,7 @@ class LocatorGenerator {
         else if (lowerStrategy === 'id') {
             // Try to find ANY element with an ID that is fuzzily close
             const elements = this.querySelectorAllDeep('[id]');
-            const matches = Array.from(elements).filter(el => {
+            const matches = this._fuzzyFilter(elements, finalLimit, el => {
                 const cleanId = clean(el.id);
                 if (cleanId === target) return true; // Case/Space match
                 const dist = this.levenshtein(cleanId, target);
@@ -1104,7 +1117,7 @@ class LocatorGenerator {
         // --- Name ---
         else if (lowerStrategy === 'name') {
             const elements = this.querySelectorAllDeep('[name]');
-            const matches = Array.from(elements).filter(el => {
+            const matches = this._fuzzyFilter(elements, finalLimit, el => {
                 const cleanName = clean(el.getAttribute('name'));
                 if (cleanName === target) return true;
                 const dist = this.levenshtein(cleanName, target);
@@ -1117,7 +1130,7 @@ class LocatorGenerator {
         // --- ClassName ---
         else if (lowerStrategy === 'classname') {
             const elements = this.querySelectorAllDeep('[class]');
-            const matches = Array.from(elements).filter(el => {
+            const matches = this._fuzzyFilter(elements, finalLimit, el => {
                 const classes = (el.getAttribute('class') || '').split(/\s+/);
                 return classes.some(cls => {
                     const cleanCls = clean(cls);
@@ -1145,7 +1158,7 @@ class LocatorGenerator {
         // --- TagName ---
         else if (lowerStrategy === 'tagname') {
             const elements = this.querySelectorAllDeep('*');
-            const matches = Array.from(elements).filter(el => {
+            const matches = this._fuzzyFilter(elements, finalLimit, el => {
                 const cleanTag = clean(el.tagName);
                 if (cleanTag === target) return true;
                 const dist = this.levenshtein(cleanTag, target);
@@ -1163,7 +1176,7 @@ class LocatorGenerator {
                 const isId = selector.startsWith('#');
                 const cleanTarget = clean(selector.substring(1));
                 const elements = this.querySelectorAllDeep(isId ? '[id]' : '[class]');
-                const matches = Array.from(elements).filter(el => {
+                const matches = this._fuzzyFilter(elements, finalLimit, el => {
                     const val = isId ? el.id : (el.getAttribute('class') || '');
                     if (!val) return false;
                     if (isId) {
@@ -1195,7 +1208,7 @@ class LocatorGenerator {
                     const tag = tagMatch ? tagMatch[1] : '*';
 
                     const elements = this.querySelectorAllDeep(tag);
-                    const matches = Array.from(elements).filter(el => {
+                    const matches = this._fuzzyFilter(elements, finalLimit, el => {
                         const val = el.getAttribute(attrName);
                         if (!val) return false;
                         return this.levenshtein(clean(val), attrValue) <= Math.max(1, Math.floor(attrValue.length / 4));
