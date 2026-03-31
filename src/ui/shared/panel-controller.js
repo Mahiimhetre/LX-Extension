@@ -475,7 +475,7 @@ const LocatorX = {
                     const val = matching ? matching.locator : '-';
                     // Add distinct style for empty
                     const style = matching ? '' : 'color: var(--secondary-text); opacity: 0.5;';
-                    row.innerHTML += `<td class="lx-editable" data-target="pom-cell" data-locator-type="${type}" style="${style}">${val}</td>`;
+                    row.innerHTML += `<td class="lx-editable" data-target="pom-cell" data-locator-type="${type}" style="${style}">${LocatorX.utils.escapeHtml(val)}</td>`;
                 });
 
                 // Render Grouped Column (Relative XPath) if needed
@@ -1170,7 +1170,7 @@ const LocatorX = {
                     <td>${index + 1}</td>
                     <td><span class="match-count" id="${matchId}" data-count="..."></span></td>
                     <td class="lx-editable ms-type-cell">${type}</td>
-                    <td class="lx-editable">${locator}</td>
+                    <td class="lx-editable">${LocatorX.utils.escapeHtml(locator)}</td>
                     <td>
                         <i class="bi-clipboard ms-copy-icon" title="Copy"></i>
                     </td>
@@ -1971,7 +1971,7 @@ const LocatorX = {
                     <td>${locator.type}</td>
                     <td class="lx-editable locator-cell" data-target="table-cell">
                         <span class="locator-wrapper">
-                            <span class="locator-text">${locator.locator}</span>
+                            <span class="locator-text">${LocatorX.utils.escapeHtml(locator.locator)}</span>
                             ${this._createWarningIcon(locator.warnings)}
                         </span>
                     </td>
