@@ -527,8 +527,8 @@ const LocatorX = {
 
                 // Actions Column
                 row.innerHTML += `<td>
-                        <i class="bi-clipboard" title="Copy"></i>
-                        <i class="bi-trash" title="Delete"></i>
+                        <i class="bi-clipboard" title="Copy" role="button" tabindex="0"></i>
+                        <i class="bi-trash" title="Delete" role="button" tabindex="0"></i>
                     </td>
                 `;
 
@@ -1172,7 +1172,7 @@ const LocatorX = {
                     <td class="lx-editable ms-type-cell">${type}</td>
                     <td class="lx-editable">${locator}</td>
                     <td>
-                        <i class="bi-clipboard ms-copy-icon" title="Copy"></i>
+                        <i class="bi-clipboard ms-copy-icon" title="Copy" role="button" tabindex="0"></i>
                     </td>
                 `;
                 tbody.appendChild(row);
@@ -1837,8 +1837,8 @@ const LocatorX = {
                     <td class="lx-editable" data-target="table-cell" style="color: var(--secondary-text); opacity: 0.5;"></td>
                     <td class="time-column ${this.showTimestamp ? '' : 'hidden'}">-</td>
                     <td>
-                        <i class="bi-clipboard disabled" title="Copy"></i>
-                        <i class="bi-bookmark-plus disabled" title="Save"></i>
+                        <i class="bi-clipboard disabled" title="Copy" role="button" tabindex="0"></i>
+                        <i class="bi-bookmark-plus disabled" title="Save" role="button" tabindex="0"></i>
                     </td>
                     `;
                 tbody.appendChild(row);
@@ -2144,8 +2144,8 @@ const LocatorX = {
             const cls = isDisabled ? 'disabled' : '';
             return `
     <td >
-                    <i class="bi-clipboard ${cls}" title="Copy"></i>
-                    <i class="bi-bookmark-plus ${cls}" title="Save"></i>
+                    <i class="bi-clipboard ${cls}" title="Copy" role="button" tabindex="0"></i>
+                    <i class="bi-bookmark-plus ${cls}" title="Save" role="button" tabindex="0"></i>
                 </td >
     `;
         },
@@ -3450,8 +3450,8 @@ const LocatorX = {
                                     <span class="saved-type-badge ${typeClass}">${item.type}</span>
                                 </div>
                                 <div class="saved-actions">
-                                    <i class="bi-clipboard header-icon-button saved-copy" title="Copy Locator" style="font-size: 12px; margin: 0 2px;"></i>
-                                    <i class="bi-trash header-icon-button saved-delete" title="Delete" style="font-size: 12px; margin: 0 2px;"></i>
+                                    <i class="bi-clipboard header-icon-button saved-copy" title="Copy Locator" style="font-size: 12px; margin: 0 2px;" role="button" tabindex="0"></i>
+                                    <i class="bi-trash header-icon-button saved-delete" title="Delete" style="font-size: 12px; margin: 0 2px;" role="button" tabindex="0"></i>
                                 </div>
                             </div>
                             <div class="saved-locator-code" title="${item.locator}">${item.locator}</div>
