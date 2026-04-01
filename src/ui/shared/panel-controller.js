@@ -3446,15 +3446,15 @@ const LocatorX = {
                         <div class="saved-item" data-index="${index}">
                             <div class="saved-main">
                                 <div class="saved-info">
-                                    <span class="saved-name lx-editable" title="Double-click to rename" data-target="saved-name" data-index="${index}">${item.name}</span>
-                                    <span class="saved-type-badge ${typeClass}">${item.type}</span>
+                                    <span class="saved-name lx-editable" title="Double-click to rename" data-target="saved-name" data-index="${index}">${LocatorX.utils.escapeHtml(item.name)}</span>
+                                    <span class="saved-type-badge ${typeClass}">${LocatorX.utils.escapeHtml(item.type)}</span>
                                 </div>
                                 <div class="saved-actions">
                                     <i class="bi-clipboard header-icon-button saved-copy" title="Copy Locator" style="font-size: 12px; margin: 0 2px;"></i>
                                     <i class="bi-trash header-icon-button saved-delete" title="Delete" style="font-size: 12px; margin: 0 2px;"></i>
                                 </div>
                             </div>
-                            <div class="saved-locator-code" title="${item.locator}">${item.locator}</div>
+                            <div class="saved-locator-code" title="${LocatorX.utils.escapeHtml(item.locator)}">${LocatorX.utils.escapeHtml(item.locator)}</div>
                         </div>
                     `;
                 });
