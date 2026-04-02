@@ -15,7 +15,7 @@ const LocatorX = {
             notification.className = `notification ${type}`;
             notification.innerHTML = `
                 <i class="bi ${this._getIcon(type)}"></i>
-                <span class="message">${message}</span>
+                <span class="message">${LocatorX.utils.escapeHtml(message)}</span>
             `;
 
             container.appendChild(notification);
@@ -43,7 +43,7 @@ const LocatorX = {
             notification.className = `notification warning undo-toast`;
             notification.innerHTML = `
                 <i class="bi bi-arrow-counterclockwise"></i>
-                <span class="message" style="flex:1;">${message}</span>
+                <span class="message" style="flex:1;">${LocatorX.utils.escapeHtml(message)}</span>
                 <button class="undo-btn" style="background:var(--accent);border:none;border-radius:4px;color:#fff;padding:2px 8px;cursor:pointer;font-size:11px;font-weight:600;">Undo</button>
             `;
 
