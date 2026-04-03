@@ -3370,6 +3370,23 @@ const LocatorX = {
     },
 
     // Initialize all modules
+    accessibility: {
+        init() {
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    const el = document.activeElement;
+                    // Only trigger if the element is actually one of our custom buttons
+                    if (el && (el.getAttribute('role') === 'button' || el.tagName === 'I' || el.tagName === 'LI')) {
+                        if (!el.classList.contains('disabled') && el.getAttribute('aria-disabled') !== 'true') {
+                            e.preventDefault();
+                            el.click();
+                        }
+                    }
+                }
+            });
+        }
+    },
+
     async init() {
         this.modal = new LocatorXModal();
         this.core = new LocatorXCore();
@@ -3396,6 +3413,7 @@ const LocatorX = {
 
         this.auth.init();
         this.conflict.init();
+        this.accessibility.init();
 
         // Check site support
         if (typeof SiteSupport !== 'undefined') {
