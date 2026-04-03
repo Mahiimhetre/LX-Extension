@@ -1046,6 +1046,19 @@ class LocatorGenerator {
         return null;
     }
 
+    // Performance optimized filter for NodeLists avoiding array allocation
+    _fuzzyFilter(elements, finalLimit, matchFn) {
+        const matches = [];
+        for (let i = 0; i < elements.length; i++) {
+            if (matches.length >= finalLimit) break;
+            const el = elements[i];
+            if (matchFn(el)) {
+                matches.push(el);
+            }
+        }
+        return matches;
+    }
+
     validateLocator(selector, strategy, shouldFuzzyMatch = false, limit = 150) {
         // Enforce hard cap
         const maxCap = (typeof LocatorXConfig !== 'undefined') ? LocatorXConfig.LIMITS.MAX_MATCH_DEFAULT : 500;

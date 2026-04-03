@@ -923,3 +923,10 @@ class DOMScanner {
 
 // Initialize scanner
 const domScanner = new DOMScanner();
+
+// Export for Node.js testing
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = DOMScanner;
+} else {
+    window.DOMScanner = DOMScanner;
+}
