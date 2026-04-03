@@ -107,6 +107,7 @@
                             <div class="dropdown-header">
                                 <strong>Settings</strong>
                                 <i class="bi-arrow-clockwise reset-settings-btn" id="resetSettingsBtn"
+                                    title="Reset to Defaults" data-feature="ui.settings.reset" role="button" tabindex="0" aria-label="Reset Settings to Defaults"></i>
                                     title="Reset to Defaults" data-feature="ui.settings.reset" role="button" tabindex="0" aria-label="Reset to Defaults"></i>
                             </div>
                             <div class="settings-content">
@@ -201,7 +202,7 @@
             <div class="relative-xpath-nested" id="relativeXPathNested" hidden>
                 <fieldset class="nested-options">
                     <legend>Strategies <i class="bi-check2-square nested-select-all" id="nestedSelectAll"
-                            title="Select/Deselect All"></i></legend>
+                            title="Select/Deselect All" role="button" tabindex="0" aria-label="Select or Deselect All Strategies"></i></legend>
                     <label><input type="checkbox" class="nested-loc-type" id="relativeXpathLocator" value="xpath"
                             data-feature="locator.relativeXpath" checked>relative</label>
                     <label><input type="checkbox" class="nested-loc-type" id="containsXpathLocator" value="contains"
@@ -229,7 +230,7 @@
                             <input type="text" id="codeModeInput" class="save-input"
                                 placeholder="Select or type pattern..." autocomplete="off"
                                 style="width: 100%; height: 20px; border-color: var(--accent); box-sizing: border-box;">
-                            <i class="bi bi-x-circle-fill clear-btn hidden"></i>
+                            <i class="bi bi-x-circle-fill clear-btn hidden" role="button" tabindex="0" aria-label="Clear Pattern"></i>
                             <div id="codeModeDropdown" class="search-dropdown"></div>
                         </div>
                     </div>
@@ -240,6 +241,7 @@
                     <div class="input-group">
                         <input type="text" class="search-input" id="searchInput"
                             placeholder="Enter selector or element..." autocomplete="off">
+                        <i class="bi bi-x-circle-fill clear-btn hidden" id="searchSearchClearBtn" role="button" tabindex="0" aria-label="Clear Search Input"></i>
                         <i class="bi bi-x-circle-fill clear-btn hidden" id="searchSearchClearBtn" role="button" tabindex="0" aria-label="Clear Search"></i>
                         <div id="searchDropdown" class="search-dropdown"></div>
                     </div>
@@ -253,7 +255,7 @@
                     <div class="input-group">
                         <input type="text" class="save-input" placeholder="Enter name to save..."
                             style="font-size: 10px;">
-                        <i class="bi bi-x-circle-fill clear-btn hidden"></i>
+                        <i class="bi bi-x-circle-fill clear-btn hidden" role="button" tabindex="0" aria-label="Clear Name Input"></i>
                     </div>
                     <button class="save-btn" title="Save">
                         Save
@@ -345,7 +347,7 @@
             </div>
             <div class="dynamic-container view-container">
                 <div class="dynamic-header">
-                    <button class="header-icon-button" id="closeDynamicBtn" title="Back">
+                    <button class="header-icon-button" id="closeDynamicBtn" title="Back" aria-label="Go Back">
                         <i class="bi-arrow-left"></i>
                     </button>
                     <span id="dynamicTitle" class="dynamic-title">Result</span>
