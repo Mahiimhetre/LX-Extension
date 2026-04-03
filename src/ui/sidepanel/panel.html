@@ -23,12 +23,12 @@
     <div class="container">
         <header class="header">
             <i class="bi-arrow-up-left-circle inspect-button header-icon-button" id="inspectBtn"
-                title="Inspect Elements"></i>
+                title="Inspect Elements" role="button" tabindex="0" aria-label="Inspect Elements"></i>
             <div class="header-actions">
                 <i class="bi-bug header-icon-button" id="freezeBtn" title="Freeze Page (Requires DevTools F12)"
-                    data-feature="module.debugger"></i>
+                    data-feature="module.debugger" role="button" tabindex="0" aria-label="Freeze Page"></i>
                 <i class="bi-circle-half theme-button header-icon-button" id="themeBtn" title="Change theme"
-                    data-feature="ui.theme.dark"></i>
+                    data-feature="ui.theme.dark" role="button" tabindex="0" aria-label="Change theme"></i>
             </div>
             <div class="header-content">
                 <div class="title-block">
@@ -52,19 +52,19 @@
         <nav class="navbar">
             <div class="nav-content">
                 <ul class="nav-options">
-                    <li class="nav-option" id="navHome">
+                    <li class="nav-option" id="navHome" role="button" tabindex="0" aria-label="Home View">
                         <div class="nav-home">
                             <i class="bi-house"></i>
                             <span>Home</span>
                         </div>
                     </li>
-                    <li class="nav-option" id="navPOM" data-feature="module.pom">
+                    <li class="nav-option" id="navPOM" data-feature="module.pom" role="button" tabindex="0" aria-label="POM View">
                         <div class="nav-pom">
                             <i class="bi-diagram-3"></i>
                             <span>POM</span>
                         </div>
                     </li>
-                    <li class="nav-option" id="navAxes" data-feature="module.axes">
+                    <li class="nav-option" id="navAxes" data-feature="module.axes" role="button" tabindex="0" aria-label="Axes View">
                         <div class="nav-axes">
                             <i class="bi-diagram-2"></i>
                             <span>Axes</span>
@@ -72,13 +72,13 @@
                     </li>
                 </ul>
                 <ul class="nav-items">
-                    <li class="nav-item" id="navMultiScan" data-feature="module.multiScan">
+                    <li class="nav-item" id="navMultiScan" data-feature="module.multiScan" role="button" tabindex="0" aria-label="MultiScan">
                         <i class="bi-file-earmark-break" title="MultiScan"></i>
                     </li>
-                    <li class="nav-item" id="navCodeMode" title="Code Mode">
+                    <li class="nav-item" id="navCodeMode" title="Code Mode" role="button" tabindex="0" aria-label="Code Mode">
                         <i class="bi-code-slash"></i>
                     </li>
-                    <li class="nav-item" id="navAbout">
+                    <li class="nav-item" id="navAbout" role="button" tabindex="0" aria-label="Saved Locators">
                         <i class="bi-bookmark"></i>
                         <div id="aboutDropdown" class="navdropdown">
                             <div class="dropdown-header">
@@ -86,7 +86,7 @@
                             </div>
                         </div>
                     </li>
-                    <li class="nav-item" id="navHistory" data-feature="module.history">
+                    <li class="nav-item" id="navHistory" data-feature="module.history" role="button" tabindex="0" aria-label="History">
                         <i class="bi-clock-history"></i>
                         <div id="customDropdown" class="navdropdown">
                             <div class="dropdown-header">
@@ -101,13 +101,13 @@
                             </div>
                         </div>
                     </li>
-                    <li class="nav-item" id="navSettings">
+                    <li class="nav-item" id="navSettings" role="button" tabindex="0" aria-label="Settings">
                         <i class="bi-gear"></i>
                         <div id="settingsDropdown" class="navdropdown">
                             <div class="dropdown-header">
                                 <strong>Settings</strong>
                                 <i class="bi-arrow-clockwise reset-settings-btn" id="resetSettingsBtn"
-                                    title="Reset to Defaults" data-feature="ui.settings.reset"></i>
+                                    title="Reset to Defaults" data-feature="ui.settings.reset" role="button" tabindex="0" aria-label="Reset to Defaults"></i>
                             </div>
                             <div class="settings-content">
                                 <div class="setting-group">
@@ -240,13 +240,13 @@
                     <div class="input-group">
                         <input type="text" class="search-input" id="searchInput"
                             placeholder="Enter selector or element..." autocomplete="off">
-                        <i class="bi bi-x-circle-fill clear-btn hidden" id="searchSearchClearBtn"></i>
+                        <i class="bi bi-x-circle-fill clear-btn hidden" id="searchSearchClearBtn" role="button" tabindex="0" aria-label="Clear Search"></i>
                         <div id="searchDropdown" class="search-dropdown"></div>
                     </div>
                     <div class="badge-container">
-                        <i class="bi bi-chevron-left nav-btn hidden" id="prevMatchBtn" title="Previous Match"></i>
+                        <i class="bi bi-chevron-left nav-btn hidden" id="prevMatchBtn" title="Previous Match" role="button" tabindex="0" aria-label="Previous Match"></i>
                         <span id="searchMatchBadge" class="match-badge hidden" data-count="0"></span>
-                        <i class="bi bi-chevron-right nav-btn hidden" id="nextMatchBtn" title="Next Match"></i>
+                        <i class="bi bi-chevron-right nav-btn hidden" id="nextMatchBtn" title="Next Match" role="button" tabindex="0" aria-label="Next Match"></i>
                     </div>
                 </div>
                 <div class="control-group">
@@ -288,9 +288,9 @@
                         </select>
                     </div>
                     <div class="pom-actions">
-                        <i class="bi-plus-circle-dotted action-btn" id="addPageBtn" title="New Page"></i>
-                        <i class="bi-pencil action-btn" id="editPageBtn" title="Rename Page"></i>
-                        <i class="bi-trash action-btn" id="deletePageBtn" title="Delete Page"></i>
+                        <i class="bi-plus-circle-dotted action-btn" id="addPageBtn" title="New Page" role="button" tabindex="0" aria-label="New Page"></i>
+                        <i class="bi-pencil action-btn" id="editPageBtn" title="Rename Page" role="button" tabindex="0" aria-label="Rename Page"></i>
+                        <i class="bi-trash action-btn" id="deletePageBtn" title="Delete Page" role="button" tabindex="0" aria-label="Delete Page"></i>
                     </div>
                 </div>
                 <div class="table-container">
@@ -320,7 +320,7 @@
                     </div>
 
                     <!-- Swap Button -->
-                    <div class="nav-item" id="axesSwapBtn" title="Swap Anchor & Target">
+                    <div class="nav-item" id="axesSwapBtn" title="Swap Anchor & Target" role="button" tabindex="0" aria-label="Swap Anchor and Target">
                         <i class="bi-arrow-left-right"></i>
                     </div>
 
@@ -359,7 +359,7 @@
     <footer class="footer">
         <div class="footer-content">
             <div class="auth-container">
-                <i class="bi-person-circle login-btn header-icon-button" id="loginBtn" title="Login"></i>
+                <i class="bi-person-circle login-btn header-icon-button" id="loginBtn" title="Login" role="button" tabindex="0" aria-label="Login"></i>
                 <div id="userProfile" class="user-profile hidden">
                     <!-- Trigger -->
                     <div id="userDropdownTrigger"
