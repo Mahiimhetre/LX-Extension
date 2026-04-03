@@ -1,4 +1,0 @@
-## 2024-04-03 - Global Keyboard Listeners for Accessibility Break Input
-
-**Learning:** When implementing global keyboard event listeners (like 'Enter' or 'Space') to make custom UI elements (like `<i>` or `<li>` icon buttons) accessible, it is critical to explicitly check the `tagName` or `role` of `document.activeElement`. If the check is too broad, the listener may intercept keystrokes meant for `<input>` or `<textarea>` elements, breaking normal typing functionality (like typing spaces in search bars).
-**Action:** Always constrain global keyboard handlers to strictly match only the intended custom elements (e.g., `el.getAttribute('role') === 'button' || el.tagName === 'I' || el.tagName === 'LI'`). Never rely solely on the absence of disabled classes to determine if an element should intercept keystrokes.
