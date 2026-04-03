@@ -1,5 +1,3 @@
-# Palette's Journal
-
-## 2024-05-17 - Creating initial journal
-**Learning:** Initializing the journal for future learnings.
-**Action:** Keep this file around.
+## 2024-05-30 - Icon Button Accessibility
+**Learning:** Many interactive elements in the side panel were built using `<i>` and `<li>` tags with icon classes (like `.bi-gear`, `.bi-bug`) without appropriate ARIA attributes. This made them inaccessible to screen readers and keyboard users as they lacked `role="button"`, `tabindex="0"`, and `aria-label`.
+**Action:** When creating new UI components, especially for browser extensions where custom icons are frequently used, always ensure interactive, non-button elements (like `<i>`, `<span>`, `<div>`, `<li>`) that act as buttons have `role="button"`, `tabindex="0"`, and a descriptive `aria-label` or `title`. Ensure keyboard event listeners (Enter/Space) are also attached if a click handler is present, or rely on the global accessibility init if one exists (like `LocatorX.accessibility.init()`).
