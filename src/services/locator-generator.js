@@ -1065,104 +1065,132 @@ class LocatorGenerator {
         const clean = (str) => (str || '').replace(/\s+/g, '').toLowerCase();
         const target = clean(selector);
 
-        // Helper to avoid allocating Arrays and allow early exit
-        const getMatches = (elements, predicate) => {
-            const result = [];
-            for (let i = 0; i < elements.length; i++) {
-                if (result.length >= finalLimit) break;
-                if (predicate(elements[i])) result.push(elements[i]);
-            }
-            return result;
-        };
-
         // --- Link Text & Partial Link Text ---
         if (lowerStrategy === 'linktext' || lowerStrategy === 'partiallinktext') {
             const links = this.querySelectorAllDeep('a');
-            const matches = getMatches(links, link => {
+            // Optimization: Replaced Array.from().filter() with a native for-loop and early break
+            // to avoid unnecessary memory allocation and expensive computations once the limit is reached.
+            for (let i = 0; i < links.length; i++) {
+                if (count >= finalLimit) break;
+                const link = links[i];
                 const cleanLink = clean(link.textContent);
+                let matched = false;
 
                 // Direct Fuzzy Match (Case/Space)
-                if (lowerStrategy === 'linktext' && cleanLink === target) return true;
-                if (lowerStrategy === 'partiallinktext' && cleanLink.includes(target)) return true;
-
+                if (lowerStrategy === 'linktext' && cleanLink === target) matched = true;
+                else if (lowerStrategy === 'partiallinktext' && cleanLink.includes(target)) matched = true;
                 // Spelling Check (Levenshtein) - ONLY for explicit Link Text
-                if (lowerStrategy === 'linktext' && Math.abs(cleanLink.length - target.length) < 4) {
+                else if (lowerStrategy === 'linktext' && Math.abs(cleanLink.length - target.length) < 4) {
                     const dist = this.levenshtein(cleanLink, target);
                     const threshold = Math.max(1, Math.min(3, Math.floor(target.length / 4)));
-                    return dist <= threshold;
+                    if (dist <= threshold) matched = true;
                 }
-                return false;
-            });
-            count = matches.length;
-            if (count > 0) suggestion = matches[0].textContent.trim();
+
+                if (matched) {
+                    if (count === 0) suggestion = link.textContent.trim();
+                    count++;
+                }
+            }
         }
 
         // --- ID ---
         else if (lowerStrategy === 'id') {
             // Try to find ANY element with an ID that is fuzzily close
             const elements = this.querySelectorAllDeep('[id]');
-            const matches = getMatches(elements, el => {
+            // Optimization: Lazy evaluation using for-loop to prevent processing thousands of elements unnecessarily.
+            for (let i = 0; i < elements.length; i++) {
+                if (count >= finalLimit) break;
+                const el = elements[i];
                 const cleanId = clean(el.id);
-                if (cleanId === target) return true; // Case/Space match
-                const dist = this.levenshtein(cleanId, target);
-                return dist <= Math.max(1, Math.min(3, Math.floor(target.length / 4)));
-            });
-            count = matches.length;
-            if (count > 0) suggestion = matches[0].id;
+                let matched = false;
+
+                if (cleanId === target) matched = true; // Case/Space match
+                else {
+                    const dist = this.levenshtein(cleanId, target);
+                    if (dist <= Math.max(1, Math.min(3, Math.floor(target.length / 4)))) matched = true;
+                }
+
+                if (matched) {
+                    if (count === 0) suggestion = el.id;
+                    count++;
+                }
+            }
         }
 
         // --- Name ---
         else if (lowerStrategy === 'name') {
             const elements = this.querySelectorAllDeep('[name]');
-            const matches = getMatches(elements, el => {
+            // Optimization: Lazy evaluation using for-loop with early exit.
+            for (let i = 0; i < elements.length; i++) {
+                if (count >= finalLimit) break;
+                const el = elements[i];
                 const cleanName = clean(el.getAttribute('name'));
-                if (cleanName === target) return true;
-                const dist = this.levenshtein(cleanName, target);
-                return dist <= Math.max(1, Math.min(3, Math.floor(target.length / 4)));
-            });
-            count = matches.length;
-            if (count > 0) suggestion = matches[0].getAttribute('name');
+                let matched = false;
+
+                if (cleanName === target) matched = true;
+                else {
+                    const dist = this.levenshtein(cleanName, target);
+                    if (dist <= Math.max(1, Math.min(3, Math.floor(target.length / 4)))) matched = true;
+                }
+
+                if (matched) {
+                    if (count === 0) suggestion = el.getAttribute('name');
+                    count++;
+                }
+            }
         }
 
         // --- ClassName ---
         else if (lowerStrategy === 'classname') {
             const elements = this.querySelectorAllDeep('[class]');
-            const matches = getMatches(elements, el => {
+            // Optimization: Lazy evaluation using for-loop with early exit.
+            for (let i = 0; i < elements.length; i++) {
+                if (count >= finalLimit) break;
+                const el = elements[i];
                 const classes = (el.getAttribute('class') || '').split(/\s+/);
-                return classes.some(cls => {
+                let matchedCls = null;
+
+                for (const cls of classes) {
                     const cleanCls = clean(cls);
-                    if (cleanCls === target) return true;
+                    if (cleanCls === target) {
+                        matchedCls = cls;
+                        break;
+                    }
                     const dist = this.levenshtein(cleanCls, target);
-                    return dist <= Math.max(1, Math.min(3, Math.floor(target.length / 4)));
-                });
-            });
-            count = matches.length;
-            // Note: ClassName suggestion is tricky because multiple elements might match different fuzzy classes.
-            // We'll return the first confident match.
-            if (count > 0) {
-                // Find the specific class that matched
-                const matchedEl = matches[0];
-                const classes = (matchedEl.getAttribute('class') || '').split(/\s+/);
-                const matchedClass = classes.find(cls => {
-                    const cleanCls = clean(cls);
-                    const dist = this.levenshtein(cleanCls, target);
-                    return cleanCls === target || dist <= Math.max(1, Math.min(3, Math.floor(target.length / 4)));
-                });
-                if (matchedClass) suggestion = matchedClass;
+                    if (dist <= Math.max(1, Math.min(3, Math.floor(target.length / 4)))) {
+                        matchedCls = cls;
+                        break;
+                    }
+                }
+
+                if (matchedCls !== null) {
+                    if (count === 0) suggestion = matchedCls;
+                    count++;
+                }
             }
         }
 
         // --- TagName ---
         else if (lowerStrategy === 'tagname') {
             const elements = this.querySelectorAllDeep('*');
-            const matches = getMatches(elements, el => {
+            // Optimization: Lazy evaluation using for-loop with early exit.
+            for (let i = 0; i < elements.length; i++) {
+                if (count >= finalLimit) break;
+                const el = elements[i];
                 const cleanTag = clean(el.tagName);
-                if (cleanTag === target) return true;
-                const dist = this.levenshtein(cleanTag, target);
-                return dist <= 1; // Strict threshold for tags (div vs dav)
-            });
-            count = matches.length;
-            if (count > 0) suggestion = matches[0].tagName.toLowerCase();
+                let matched = false;
+
+                if (cleanTag === target) matched = true;
+                else {
+                    const dist = this.levenshtein(cleanTag, target);
+                    if (dist <= 1) matched = true; // Strict threshold for tags (div vs dav)
+                }
+
+                if (matched) {
+                    if (count === 0) suggestion = el.tagName.toLowerCase();
+                    count++;
+                }
+            }
         }
 
         // --- CSS & XPath Healing ---
@@ -1173,25 +1201,38 @@ class LocatorGenerator {
                 const isId = selector.startsWith('#');
                 const cleanTarget = clean(selector.substring(1));
                 const elements = this.querySelectorAllDeep(isId ? '[id]' : '[class]');
-                const matches = getMatches(elements, el => {
-                    const val = isId ? el.id : (el.getAttribute('class') || '');
-                    if (!val) return false;
-                    if (isId) {
-                        return this.levenshtein(clean(val), cleanTarget) <= Math.max(1, Math.floor(cleanTarget.length / 4));
-                    } else {
-                        return val.split(/\s+/).some(cls => this.levenshtein(clean(cls), cleanTarget) <= Math.max(1, Math.floor(cleanTarget.length / 4)));
-                    }
-                });
 
-                count = matches.length;
-                if (count > 0) {
-                    const matchedEl = matches[0];
+                // Optimization: Lazy evaluation using for-loop with early exit.
+                for (let i = 0; i < elements.length; i++) {
+                    if (count >= finalLimit) break;
+                    const el = elements[i];
+                    const val = isId ? el.id : (el.getAttribute('class') || '');
+                    if (!val) continue;
+
+                    let matched = false;
+                    let matchedCls = null;
+
                     if (isId) {
-                        suggestion = '#' + matchedEl.id;
+                        if (this.levenshtein(clean(val), cleanTarget) <= Math.max(1, Math.floor(cleanTarget.length / 4))) {
+                            matched = true;
+                        }
                     } else {
-                        const classes = (matchedEl.getAttribute('class') || '').split(/\s+/);
-                        const matchedClass = classes.find(cls => this.levenshtein(clean(cls), cleanTarget) <= Math.max(1, Math.floor(cleanTarget.length / 4)));
-                        if (matchedClass) suggestion = '.' + matchedClass;
+                        const classes = val.split(/\s+/);
+                        for (const cls of classes) {
+                            if (this.levenshtein(clean(cls), cleanTarget) <= Math.max(1, Math.floor(cleanTarget.length / 4))) {
+                                matched = true;
+                                matchedCls = cls;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (matched) {
+                        if (count === 0) {
+                            if (isId) suggestion = '#' + el.id;
+                            else if (matchedCls) suggestion = '.' + matchedCls;
+                        }
+                        count++;
                     }
                 }
             }
@@ -1205,17 +1246,20 @@ class LocatorGenerator {
                     const tag = tagMatch ? tagMatch[1] : '*';
 
                     const elements = this.querySelectorAllDeep(tag);
-                    const matches = getMatches(elements, el => {
+                    // Optimization: Lazy evaluation using for-loop with early exit.
+                    for (let i = 0; i < elements.length; i++) {
+                        if (count >= finalLimit) break;
+                        const el = elements[i];
                         const val = el.getAttribute(attrName);
-                        if (!val) return false;
-                        return this.levenshtein(clean(val), attrValue) <= Math.max(1, Math.floor(attrValue.length / 4));
-                    });
+                        if (!val) continue;
 
-                    count = matches.length;
-                    if (count > 0) {
-                        const matchedEl = matches[0];
-                        const realVal = matchedEl.getAttribute(attrName);
-                        suggestion = selector.replace(match[2], realVal);
+                        if (this.levenshtein(clean(val), attrValue) <= Math.max(1, Math.floor(attrValue.length / 4))) {
+                            if (count === 0) {
+                                const realVal = el.getAttribute(attrName);
+                                suggestion = selector.replace(match[2], realVal);
+                            }
+                            count++;
+                        }
                     }
                 }
             }
