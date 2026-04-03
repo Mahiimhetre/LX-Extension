@@ -4,3 +4,7 @@ node_modules/
 dist/
 .env
 /export_req
+/tmp
+/temp
+tmp/
+temp/
