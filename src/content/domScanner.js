@@ -7,6 +7,7 @@ class DOMScanner {
         this.lastRightClickedElement = null;
         this.matchedElements = []; // The elements currently matched
         this.axesState = { step: 0, anchor: null }; // Axes capture state
+        this.persistentInspect = false;
 
         // Init plan service for logic usage
         this.planService = typeof PlanService !== 'undefined' ? new PlanService() : null;
@@ -18,13 +19,15 @@ class DOMScanner {
 
         // Load config from storage logic
         if (chrome.storage && chrome.storage.local) {
-            chrome.storage.local.get(['excludeNumbers', 'maxMatchLimit'], (result) => {
+            chrome.storage.local.get(['excludeNumbers', 'maxMatchLimit', 'persistentInspectEnabled'], (result) => {
                 const val = result.excludeNumbers !== undefined ? result.excludeNumbers : true;
                 if (this.generator) this.generator.setConfig({ excludeNumbers: val });
 
                 const maxLimit = result.maxMatchLimit !== undefined ? result.maxMatchLimit : 150;
                 const maxCap = (typeof LocatorXConfig !== 'undefined') ? LocatorXConfig.LIMITS.MAX_MATCH_DEFAULT : 500;
                 this.maxMatchLimit = Math.min(maxLimit, maxCap);
+
+                this.persistentInspect = result.persistentInspectEnabled !== undefined ? result.persistentInspectEnabled : false;
             });
         }
     }
@@ -108,6 +111,9 @@ class DOMScanner {
                 if (message.config.maxMatchLimit !== undefined) {
                     this.maxMatchLimit = message.config.maxMatchLimit;
                 }
+                if (message.config.persistentInspect !== undefined) {
+                    this.persistentInspect = message.config.persistentInspect;
+                }
             }
         });
 
@@ -133,6 +139,24 @@ class DOMScanner {
         this.handleMouseClick = this.handleMouseClick.bind(this);
         this.handleKeyPress = this.handleKeyPress.bind(this);
         this.handleRightClick = this.handleRightClick.bind(this);
+
+        // Stop scanning when tab becomes hidden (user switches browser tabs)
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && this.isActive) {
+                if (!this.persistentInspect || this.currentMode === 'axes') {
+                    this.stopScanning(true);
+                    chrome.runtime.sendMessage({ action: 'deactivateInspect' }).catch(() => { });
+                } else {
+                    // Persistent mode: just clear active highlights to save CPU, but stay active
+                    this.clearHighlights('all');
+                }
+            }
+        });
+
+        // Clean up label if unloaded mid-scan
+        window.addEventListener('beforeunload', () => {
+            if (this.isActive) this.stopScanning(true);
+        });
     }
 
     updateContextMenuForElement(element) {
@@ -202,7 +226,13 @@ class DOMScanner {
     }
 
     startScanning(mode = 'home') {
-        if (this.isActive) return;
+        if (this.isActive) {
+            // Already scanning — just update mode if different
+            if (this.currentMode !== mode) {
+                this.currentMode = mode;
+            }
+            return;
+        }
 
         this.isActive = true;
         this.currentMode = mode;
@@ -229,10 +259,6 @@ class DOMScanner {
 
 
     stopScanning(force = false) {
-        if (this.isActive && !force) {
-            // check logic
-        }
-
         this.isActive = false;
 
         document.removeEventListener('mousemove', this.handleMouseMove, true);

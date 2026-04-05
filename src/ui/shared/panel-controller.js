@@ -622,8 +622,8 @@ const LocatorX = {
         },
 
         switch(tab) {
-            // Prevent switching if inspection is active
-            if (LocatorX.inspect.isActive) {
+            // Prevent switching if inspection is active (unless it is currently deactivating)
+            if (LocatorX.inspect.isActive && !LocatorX.inspect._isDeactivating) {
                 LocatorX.notifications.error('Please stop inspection before switching tabs.');
                 return;
             }
@@ -1373,6 +1373,7 @@ const LocatorX = {
             this.setupTimestampSetting();
             this.setupSmartCorrectionSetting();
             this.setupMatchLimitSetting();
+            this.setupResetBtn();
             this.loadFiltersFromStorage();
             this.saveCurrentFilters('home');
             this.updateTable();
@@ -1597,6 +1598,95 @@ const LocatorX = {
                     this.syncConfigToTab({ maxMatchLimit: val });
                 });
             }
+        },
+
+        setupResetBtn() {
+            const resetBtn = document.getElementById('resetSettingsBtn');
+            if (resetBtn) {
+                resetBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const confirmed = await LocatorX.modal.confirm(
+                        'Reset Settings',
+                        'Are you sure you want to reset all settings to defaults?',
+                        { icon: 'bi-exclamation-triangle-fill' }
+                    );
+                    if (confirmed) this.reset();
+                });
+            }
+        },
+
+        async reset() {
+            // 1. CLEAR STORAGE
+            const keysToClear = [
+                'enabledFilters',
+                'excludeNumbers',
+                'showTimestamp',
+                'smartCorrectEnabled',
+                'maxMatchLimit',
+                'locator-x-theme',
+                'persistentInspectEnabled'
+            ];
+
+            // Clear Chrome Local Storage
+            await new Promise(resolve => chrome.storage.local.remove(keysToClear, resolve));
+
+            // Clear LocalStorage settings specifically (fallback/sync)
+            localStorage.removeItem('locator-x-theme');
+            localStorage.removeItem('locator-x-settings'); 
+            
+            // 2. RESTORE UI DEFAULTS
+            // Framework
+            const fwSelect = document.getElementById('frameworkSelect');
+            if (fwSelect) fwSelect.value = 'all';
+
+            // Filters (Default: All CORE checked)
+            const allCores = LocatorXConfig.FILTER_GROUPS.CORE;
+            const coreDomIds = allCores.map(key => this.FILTER_ID_MAP[key]).filter(id => id);
+            
+            document.querySelectorAll('.loc-type, .nested-loc-type').forEach(cb => {
+                cb.checked = coreDomIds.includes(cb.id);
+                cb.disabled = false;
+                cb.parentElement.style.opacity = '1';
+                cb.parentElement.title = '';
+            });
+
+            // Toggles & Inputs
+            const excludeNumbersCfg = document.getElementById('excludeNumbersCfg');
+            if (excludeNumbersCfg) excludeNumbersCfg.checked = true;
+
+            const showTimestampCfg = document.getElementById('showTimestampCfg');
+            if (showTimestampCfg) showTimestampCfg.checked = false;
+            this.showTimestamp = false;
+            this.toggleTimestampColumn(false);
+
+            const smartCorrectCfg = document.getElementById('smartCorrectCfg');
+            if (smartCorrectCfg) smartCorrectCfg.checked = true;
+
+            const persistentInspectCfg = document.getElementById('persistentInspectCfg');
+            if (persistentInspectCfg) persistentInspectCfg.checked = false;
+
+            const maxMatchLimitCfg = document.getElementById('maxMatchLimitCfg');
+            if (maxMatchLimitCfg) maxMatchLimitCfg.value = 150;
+
+            // Theme (Reset to Light)
+            if (LocatorX.theme) {
+                LocatorX.theme.current = 'light';
+                LocatorX.theme.apply();
+            }
+
+            // 3. FINAL SYNC & UI REFRESH
+            this.updateSelectAllState();
+            this.updateNestedIcon();
+            this.syncConfigToTab({
+                excludeNumbers: true,
+                maxMatchLimit: 150,
+                showTimestamp: false
+            });
+
+            if (LocatorX.tabs.current === 'home') this.updateTable();
+            else this.updatePOMTable();
+
+            LocatorX.notifications.success('Settings reset to defaults');
         },
 
         syncConfigToTab(config) {
@@ -2936,7 +3026,10 @@ const LocatorX = {
     // Inspect Button Management
     inspect: {
         isActive: false,
+        _isDeactivating: false,
         currentMode: 'home',
+        trackedTabId: null,
+        persistentInspectActive: false,
 
 
         init() {
@@ -2951,6 +3044,7 @@ const LocatorX = {
                     }
                 });
             }
+            this.setupPersistentInspectSetting();
 
             // Listen for messages from content script
             chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -2965,10 +3059,44 @@ const LocatorX = {
                     if (LocatorX.tabs.current === 'home') {
                         this.deactivate();
                     }
-
                 } else if (message.action === 'deactivateInspect') {
                     // Handle ESC key and right-click deactivation from content script
                     this.deactivate();
+                } else if (message.action === 'activeTabChanged') {
+                    if (this.isActive) {
+                        chrome.tabs.get(message.tabId, (tab) => {
+                            if (chrome.runtime.lastError || !tab) return;
+                            chrome.windows.getCurrent((currentWin) => {
+                                if (chrome.runtime.lastError || !currentWin || tab.windowId !== currentWin.id) return;
+
+                                if (this.currentMode === 'axes') {
+                                    if (this.trackedTabId) {
+                                        chrome.tabs.sendMessage(this.trackedTabId, { action: 'stopScanning', force: true }).catch(() => { });
+                                    }
+                                    LocatorX.notifications.warn('Axes capture aborted: browser tab changed.');
+                                    this.trackedTabId = null;
+                                    this.deactivate();
+                                } else {
+                                    if (this.persistentInspectActive) {
+                                        // Keep active, skip deactivation
+                                        return;
+                                    }
+                                    if (this.trackedTabId) {
+                                        chrome.tabs.sendMessage(this.trackedTabId, { action: 'stopScanning', force: true }).catch(() => { });
+                                    }
+                                    this.trackedTabId = null;
+                                    this.deactivate();
+                                    LocatorX.notifications.warn('Inspection stopped: browser tab changed.');
+                                }
+                            });
+                        });
+                    }
+                } else if (message.action === 'tabNavigated') {
+                    if (this.isActive && message.tabId === this.trackedTabId) {
+                        this.trackedTabId = null;
+                        this.deactivate();
+                        LocatorX.notifications.warn('Inspection stopped: page navigated.');
+                    }
                 } else if (message.action === 'notification') {
                     if (message.type === 'success') LocatorX.notifications.success(message.message);
                     else if (message.type === 'error') LocatorX.notifications.error(message.message);
@@ -3048,6 +3176,7 @@ const LocatorX = {
 
             this.updateUI();
 
+            const inspectBtn = document.getElementById('inspectBtn');
             if (this.currentMode === 'axes' && inspectBtn) {
                 inspectBtn.classList.add('yellow');
 
@@ -3067,11 +3196,25 @@ const LocatorX = {
                 if (resultVal) resultVal.textContent = 'Capture Elements to get the result...';
             }
 
+            // Lock to current tab
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                if (tabs[0] && tabs[0].id) {
+                    this.trackedTabId = tabs[0].id;
+                    // Tell background which tab we're tracking
+                    if (LocatorX._port) {
+                        try {
+                            LocatorX._port.postMessage({ action: 'setTrackedTab', tabId: this.trackedTabId });
+                        } catch (e) { }
+                    }
+                }
+            });
+
             // Broadcast to ALL frames
             this.broadcastActionToTab({ action: 'startScanning', mode: this.currentMode });
         },
 
         deactivate() {
+            this._isDeactivating = true;
             this.isActive = false;
 
             const inspectBtn = document.getElementById('inspectBtn');
@@ -3083,11 +3226,40 @@ const LocatorX = {
 
             // Broadcast to ALL frames
             this.broadcastActionToTab({ action: 'stopScanning' });
+
+            setTimeout(() => {
+                this._isDeactivating = false;
+            }, 100);
+        },
+        
+        setupPersistentInspectSetting() {
+            const configKey = 'persistentInspectEnabled';
+            const checkbox = document.getElementById('persistentInspectCfg');
+            if (checkbox) {
+                chrome.storage.local.get([configKey], (result) => {
+                    const enabled = result[configKey] || false;
+                    checkbox.checked = enabled;
+                    this.persistentInspectActive = enabled;
+                });
+                checkbox.addEventListener('change', (e) => {
+                    const enabled = e.target.checked;
+                    this.persistentInspectActive = enabled;
+                    chrome.storage.local.set({ [configKey]: enabled });
+                    // Inform content script if currently picking
+                    if (this.isActive && this.trackedTabId) {
+                        chrome.tabs.sendMessage(this.trackedTabId, {
+                            action: 'updateConfig',
+                            config: { persistentInspect: enabled }
+                        }).catch(() => {});
+                    }
+                });
+            }
         },
 
         broadcastActionToTab(payload) {
             chrome.runtime.sendMessage({
                 action: 'broadcastToTab',
+                tabId: this.trackedTabId,
                 payload: payload
             }).catch(() => { });
         },
@@ -3204,15 +3376,6 @@ const LocatorX = {
             if (this.loginBtn) this.loginBtn.classList.add('hidden');
             if (this.userProfile) {
                 this.userProfile.classList.remove('hidden');
-
-                // Update Header Logo based on plan
-                // if (this.headerLogo) {
-                //     const plan = (typeof planService !== 'undefined' ? planService.currentPlan : (user.plan || 'free')).toLowerCase();
-                //     const logoPath = `../../../ assets / icons / ${plan} .png`;
-                //     if (this.headerLogo.getAttribute('src') !== logoPath) {
-                //         this.headerLogo.src = logoPath;
-                //     }
-                // }
 
                 if (this.userAvatar) {
                     if (user.avatar) {
@@ -3364,8 +3527,14 @@ const LocatorX = {
 
         toggleWarning(show) {
             if (!this.warningOverlay) return;
-            if (show) this.warningOverlay.classList.remove('hidden');
-            else this.warningOverlay.classList.add('hidden');
+            if (show) {
+                if (LocatorX.inspect && LocatorX.inspect.isActive) {
+                    LocatorX.inspect.deactivate();
+                }
+                this.warningOverlay.classList.remove('hidden');
+            } else {
+                this.warningOverlay.classList.add('hidden');
+            }
         }
     },
 
@@ -3421,7 +3590,16 @@ const LocatorX = {
         }
 
         // Establish persistent connection to background for lifecycle management
-        chrome.runtime.connect({ name: 'locatorx-panel' });
+        this._port = chrome.runtime.connect({ name: 'locatorx-panel' });
+        this._port.onDisconnect.addListener(() => {
+            // Detect Service Worker Restart
+            if (LocatorX.inspect.isActive) {
+                LocatorX.inspect.trackedTabId = null;
+                LocatorX.inspect.deactivate();
+                LocatorX.notifications.error('Connection lost. Inspection stopped.');
+            }
+            this._port = null;
+        });
     },
 
     // Saved Locators Management
@@ -3901,6 +4079,3 @@ window.LocatorXAPI = {
     getCurrentTheme: () => LocatorX.theme.current,
     closeAllDropdowns: () => LocatorX.dropdowns.closeAll()
 };
-
-// Establish long-lived connection to background script for cleanup detection
-chrome.runtime.connect({ name: 'locatorx-panel' });

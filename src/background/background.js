@@ -64,6 +64,24 @@ chrome.runtime.onStartup.addListener(() => {
     setupContextMenus();
 });
 
+// Tab switch listener
+chrome.tabs.onActivated.addListener((activeInfo) => {
+    chrome.runtime.sendMessage({
+        action: 'activeTabChanged',
+        tabId: activeInfo.tabId
+    }).catch(() => {});
+});
+
+// Tab navigation/reload listener
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (changeInfo.status === 'loading') {
+        chrome.runtime.sendMessage({
+            action: 'tabNavigated',
+            tabId: tabId
+        }).catch(() => {});
+    }
+});
+
 // Handle context menu clicks
 chrome.contextMenus.onClicked.addListener((info, tab) => {
     // 1. Deep Nested Click (Pro)
@@ -205,16 +223,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         chrome.runtime.sendMessage(message).catch(() => { });
         sendResponse({ success: true });
     } else if (message.action === 'broadcastToTab') {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            const tab = tabs[0];
-            if (tab && tab.id) {
-                chrome.webNavigation.getAllFrames({ tabId: tab.id }, (frames) => {
-                    frames.forEach(frame => {
-                        chrome.tabs.sendMessage(tab.id, message.payload, { frameId: frame.frameId }).catch(() => { });
-                    });
+        const broadcastTo = (tabId) => {
+            chrome.webNavigation.getAllFrames({ tabId: tabId }, (frames) => {
+                if (chrome.runtime.lastError) return;
+                frames.forEach(frame => {
+                    chrome.tabs.sendMessage(tabId, message.payload, { frameId: frame.frameId }).catch(() => { });
                 });
-            }
-        });
+            });
+        };
+
+        if (message.tabId) {
+            broadcastTo(message.tabId);
+        } else {
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                if (tabs[0] && tabs[0].id) {
+                    broadcastTo(tabs[0].id);
+                }
+            });
+        }
         sendResponse({ success: true });
     }
     return false;
@@ -237,13 +263,24 @@ chrome.action.onClicked.addListener((tab) => {
 // Handle sidepanel cleanup on close
 chrome.runtime.onConnect.addListener((port) => {
     if (port.name === 'locatorx-panel') {
+        let trackedTabId = null;
+        port.onMessage.addListener((msg) => {
+            if (msg.action === 'setTrackedTab') {
+                trackedTabId = msg.tabId;
+            }
+        });
+
         port.onDisconnect.addListener(() => {
-            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-                const tab = tabs[0];
-                if (tab && tab.id) {
-                    chrome.tabs.sendMessage(tab.id, { action: 'stopScanning', force: true }).catch(() => { });
-                }
-            });
+            if (trackedTabId) {
+                chrome.tabs.sendMessage(trackedTabId, { action: 'stopScanning', force: true }).catch(() => { });
+            } else {
+                chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                    const tab = tabs[0];
+                    if (tab && tab.id) {
+                        chrome.tabs.sendMessage(tab.id, { action: 'stopScanning', force: true }).catch(() => { });
+                    }
+                });
+            }
         });
     }
 
