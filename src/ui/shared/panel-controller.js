@@ -13,9 +13,10 @@ const LocatorX = {
 
             const notification = document.createElement('div');
             notification.className = `notification ${type}`;
+            const escapedMessage = LocatorX.utils.escapeHtml(message);
             notification.innerHTML = `
                 <i class="bi ${this._getIcon(type)}"></i>
-                <span class="message">${message}</span>
+                <span class="message">${escapedMessage}</span>
             `;
 
             container.appendChild(notification);
@@ -41,9 +42,10 @@ const LocatorX = {
 
             const notification = document.createElement('div');
             notification.className = `notification warning undo-toast`;
+            const escapedMessage = LocatorX.utils.escapeHtml(message);
             notification.innerHTML = `
                 <i class="bi bi-arrow-counterclockwise"></i>
-                <span class="message" style="flex:1;">${message}</span>
+                <span class="message" style="flex:1;">${escapedMessage}</span>
                 <button class="undo-btn" style="background:var(--accent);border:none;border-radius:4px;color:#fff;padding:2px 8px;cursor:pointer;font-size:11px;font-weight:600;">Undo</button>
             `;
 
@@ -372,9 +374,10 @@ const LocatorX = {
             const page = pages.find(p => p.id === this.currentPageId);
             const pageName = page ? page.name : 'this page';
 
+            const escapedPageName = LocatorX.utils.escapeHtml(pageName);
             const confirmed = await LocatorX.modal.confirm(
                 'Delete Page',
-                `Are you sure you want to delete <span style="font-weight:600; color:var(--status-red-text);">"${pageName}"</span>?`,
+                `Are you sure you want to delete <span style="font-weight:600; color:var(--status-red-text);">"${escapedPageName}"</span>?`,
                 { icon: 'bi-exclamation-triangle-fill' }
             );
             if (!confirmed) return;
@@ -386,7 +389,7 @@ const LocatorX = {
             this.currentPageId = null;
             this.loadPages();
 
-            LocatorX.notifications.undoable(`Deleted POM page "${pageName}"`, () => {
+            LocatorX.notifications.undoable(`Deleted POM page "${escapedPageName}"`, () => {
                 LocatorX.core.savePOMPage(deletedPage);
                 this.loadPages();
                 this.switchPage(deletedPageId);
@@ -467,21 +470,33 @@ const LocatorX = {
                 const hasFingerprint = !Array.isArray(item) && item.fingerprint;
 
                 const row = document.createElement('tr');
-                row.innerHTML = `<td>${index + 1}</td>`;
+                const indexCell = document.createElement('td');
+                indexCell.textContent = index + 1;
+                row.appendChild(indexCell);
 
                 // Render Standard Columns
                 standard.forEach(type => {
                     const matching = elementLocators.find(l => l.type === type);
                     const val = matching ? matching.locator : '-';
-                    // Add distinct style for empty
-                    const style = matching ? '' : 'color: var(--secondary-text); opacity: 0.5;';
-                    row.innerHTML += `<td class="lx-editable" data-target="pom-cell" data-locator-type="${type}" style="${style}">${val}</td>`;
+
+                    const td = document.createElement('td');
+                    td.className = 'lx-editable';
+                    td.dataset.target = 'pom-cell';
+                    td.dataset.locatorType = type;
+                    if (!matching) {
+                        td.style.color = 'var(--secondary-text)';
+                        td.style.opacity = '0.5';
+                    }
+                    td.textContent = val;
+                    row.appendChild(td);
                 });
 
                 // Render Grouped Column (Relative XPath) if needed
                 if (hasGrouped) {
+                    const td = document.createElement('td');
                     // Only use enabled subtypes for the dropdown
                     if (groupedTypes.length > 0) {
+                        td.className = 'strategy-cell';
                         // Find which locators actually exist for this element
                         const validGrouped = elementLocators.filter(l => groupedTypes.includes(l.type));
 
@@ -495,42 +510,70 @@ const LocatorX = {
 
                         const preferredLocatorFn = elementLocators.find(l => l.type === preferredType);
                         const preferredValue = preferredLocatorFn ? preferredLocatorFn.locator : '-';
-                        const valStyle = preferredLocatorFn ? '' : 'color: var(--secondary-text); opacity: 0.5;';
 
-                        // Create Dropdown Options
-                        const options = groupedTypes.map(type => {
+                        const container = document.createElement('div');
+                        container.className = 'pom-strategy-container';
+
+                        const select = document.createElement('select');
+                        select.className = 'strategy-select';
+
+                        groupedTypes.forEach(type => {
                             const loc = elementLocators.find(l => l.type === type);
                             const val = loc ? loc.locator : '-';
-                            const isDisabled = !loc;
-                            return `<option value="${type}" data-locator="${val}" ${type === preferredType ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}>${type}</option>`;
-                        }).join('');
+                            const option = document.createElement('option');
+                            option.value = type;
+                            option.dataset.locator = val;
+                            option.textContent = type;
+                            if (type === preferredType) option.selected = true;
+                            if (!loc) option.disabled = true;
+                            select.appendChild(option);
+                        });
 
-                        row.innerHTML += `
-                            <td class="strategy-cell">
-                                <div class="pom-strategy-container">
-                                     <select class="strategy-select">
-                                        ${options}
-                                     </select>
-                                     <div class="strategy-value lx-editable" data-target="pom-cell" data-is-strategy="true" style="${valStyle}">${preferredValue}</div>
-                                </div>
-                            </td>`;
+                        const valDiv = document.createElement('div');
+                        valDiv.className = 'strategy-value lx-editable';
+                        valDiv.dataset.target = 'pom-cell';
+                        valDiv.dataset.isStrategy = 'true';
+                        if (!preferredLocatorFn) {
+                            valDiv.style.color = 'var(--secondary-text)';
+                            valDiv.style.opacity = '0.5';
+                        }
+                        valDiv.textContent = preferredValue;
+
+                        container.appendChild(select);
+                        container.appendChild(valDiv);
+                        td.appendChild(container);
                     } else {
                         // Should technically not happen if hasGrouped is true, but safe fallback
-                        row.innerHTML += `<td class="lx-editable" data-target="pom-cell" data-locator-type="Strategy" style="color: var(--secondary-text); opacity: 0.5;"></td>`;
+                        td.className = 'lx-editable';
+                        td.dataset.target = 'pom-cell';
+                        td.dataset.locatorType = 'Strategy';
+                        td.style.color = 'var(--secondary-text)';
+                        td.style.opacity = '0.5';
+                        td.textContent = '-';
                     }
+                    row.appendChild(td);
                 }
 
                 // Time Column
                 const timestamp = item.timestamp || '-';
                 const showTimestamp = LocatorX.filters.showTimestamp;
-                row.innerHTML += `<td class="time-column ${showTimestamp ? '' : 'hidden'}">${timestamp}</td>`;
+                const timeCell = document.createElement('td');
+                timeCell.className = `time-column ${showTimestamp ? '' : 'hidden'}`;
+                timeCell.textContent = timestamp;
+                row.appendChild(timeCell);
 
                 // Actions Column
-                row.innerHTML += `<td>
-                        <i class="bi-clipboard" title="Copy"></i>
-                        <i class="bi-trash" title="Delete"></i>
-                    </td>
-                `;
+                const actionsCell = document.createElement('td');
+                const copyIcon = document.createElement('i');
+                copyIcon.className = 'bi-clipboard';
+                copyIcon.title = 'Copy';
+                const deleteIcon = document.createElement('i');
+                deleteIcon.className = 'bi-trash';
+                deleteIcon.title = 'Delete';
+                actionsCell.appendChild(copyIcon);
+                actionsCell.appendChild(document.createTextNode(' '));
+                actionsCell.appendChild(deleteIcon);
+                row.appendChild(actionsCell);
 
                 // Bind Events
                 if (hasGrouped) {
@@ -1898,7 +1941,15 @@ const LocatorX = {
                     matchCell.textContent = locator.matches;
 
                     const displayValue = this.formatLocator(locator.locator, type);
-                    valCell.innerHTML = `<span class="locator-wrapper"> <span class="locator-text">${displayValue}</span>${this._createWarningIcon(locator.warnings)}</span > `;
+                    valCell.innerHTML = '';
+                    const wrapper = document.createElement('span');
+                    wrapper.className = 'locator-wrapper';
+                    const textSpan = document.createElement('span');
+                    textSpan.className = 'locator-text';
+                    textSpan.textContent = displayValue;
+                    wrapper.appendChild(textSpan);
+                    wrapper.insertAdjacentHTML('beforeend', this._createWarningIcon(locator.warnings));
+                    valCell.appendChild(wrapper);
                     valCell.title = locator.locator; // Tooltip shows raw
 
                     valCell.classList.add('locator-cell');
@@ -1966,34 +2017,61 @@ const LocatorX = {
         renderRow(tbody, type, locator) {
             const row = document.createElement('tr');
             if (locator) {
-                row.innerHTML = `
-                    ${this._createMatchCell(locator.matches)}
-                    <td>${locator.type}</td>
-                    <td class="lx-editable locator-cell" data-target="table-cell">
-                        <span class="locator-wrapper">
-                            <span class="locator-text">${locator.locator}</span>
-                            ${this._createWarningIcon(locator.warnings)}
-                        </span>
-                    </td>
-                    <td class="time-column ${this.showTimestamp ? '' : 'hidden'}">${this.lastMetadata?.timestamp || '-'}</td>
-                    ${this._createActionCell(false)}
-`;
+                const matchCellHtml = this._createMatchCell(locator.matches);
+                row.insertAdjacentHTML('beforeend', matchCellHtml);
+
+                const typeCell = document.createElement('td');
+                typeCell.textContent = locator.type;
+                row.appendChild(typeCell);
+
+                const locatorCell = document.createElement('td');
+                locatorCell.className = 'lx-editable locator-cell';
+                locatorCell.dataset.target = 'table-cell';
+                const wrapper = document.createElement('span');
+                wrapper.className = 'locator-wrapper';
+                const textSpan = document.createElement('span');
+                textSpan.className = 'locator-text';
+                textSpan.textContent = locator.locator;
+                wrapper.appendChild(textSpan);
+                wrapper.insertAdjacentHTML('beforeend', this._createWarningIcon(locator.warnings));
+                locatorCell.appendChild(wrapper);
+                row.appendChild(locatorCell);
+
+                const timeCell = document.createElement('td');
+                timeCell.className = `time-column ${this.showTimestamp ? '' : 'hidden'}`;
+                timeCell.textContent = this.lastMetadata?.timestamp || '-';
+                row.appendChild(timeCell);
+
+                const actionCellHtml = this._createActionCell(false);
+                row.insertAdjacentHTML('beforeend', actionCellHtml);
             } else {
-                row.innerHTML = `
-                    ${this._createMatchCell(0)}
-                    <td>${type}</td>
-                    <td class="lx-editable locator-cell lx-text-disabled" data-target="table-cell"></td>
-                    <td class="time-column ${this.showTimestamp ? '' : 'hidden'}">-</td>
-                    ${this._createActionCell(true)}
-`;
+                const matchCellHtml = this._createMatchCell(0);
+                row.insertAdjacentHTML('beforeend', matchCellHtml);
+
+                const typeCell = document.createElement('td');
+                typeCell.textContent = type;
+                row.appendChild(typeCell);
+
+                const locatorCell = document.createElement('td');
+                locatorCell.className = 'lx-editable locator-cell lx-text-disabled';
+                locatorCell.dataset.target = 'table-cell';
+                row.appendChild(locatorCell);
+
+                const timeCell = document.createElement('td');
+                timeCell.className = `time-column ${this.showTimestamp ? '' : 'hidden'}`;
+                timeCell.textContent = '-';
+                row.appendChild(timeCell);
+
+                const actionCellHtml = this._createActionCell(true);
+                row.insertAdjacentHTML('beforeend', actionCellHtml);
             }
             tbody.appendChild(row);
         },
 
         _createWarningIcon(warnings) {
             if (!warnings || warnings.length === 0) return '';
-            const title = warnings.join('\n');
-            return `<i class="bi bi-exclamation-circle-fill warning-icon" title = "${title}"></i > `;
+            const title = LocatorX.utils.escapeHtml(warnings.join('\n'));
+            return `<i class="bi bi-exclamation-circle-fill warning-icon" title="${title}"></i>`;
         },
 
         renderGroupRow(tbody, availableTypes, currentType, allLocators) {
@@ -2011,22 +2089,48 @@ const LocatorX = {
                 return `<option value = "${type}" ${type === currentType ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}> ${type}</option > `;
             }).join('');
 
-            const locatorValue = locator ? `<span class="locator-wrapper"> <span class="locator-text">${locator.locator}</span>${this._createWarningIcon(locator.warnings)}</span > ` : '-';
             const locatorStyle = locator ? '' : '';
             const locatorClass = locator ? 'locator-cell' : 'lx-text-disabled';
-            const actionClass = locator ? '' : 'disabled';
 
-            row.innerHTML = `
-                ${this._createMatchCell(matchCount, 'strategyMatchCount')}
-                <td class="strategy-cell">
-                    <select id="strategySelect" class="strategy-dropdown">
-                        ${options}
-                    </select>
-                </td>
-                <td class="lx-editable ${locatorClass}" id="strategyLocator" data-target="table-cell" ${locatorStyle}>${locatorValue}</td>
-                <td class="time-column ${this.showTimestamp ? '' : 'hidden'}">${this.lastMetadata?.timestamp || '-'}</td>
-                ${this._createActionCell(!locator)}
-            `;
+            const matchCellHtml = this._createMatchCell(matchCount, 'strategyMatchCount');
+            row.insertAdjacentHTML('beforeend', matchCellHtml);
+
+            const strategyCell = document.createElement('td');
+            strategyCell.className = 'strategy-cell';
+            const select = document.createElement('select');
+            select.id = 'strategySelect';
+            select.className = 'strategy-dropdown';
+            select.innerHTML = options;
+            strategyCell.appendChild(select);
+            row.appendChild(strategyCell);
+
+            const locatorCell = document.createElement('td');
+            locatorCell.className = `lx-editable ${locatorClass}`;
+            locatorCell.id = 'strategyLocator';
+            locatorCell.dataset.target = 'table-cell';
+            if (locatorStyle) locatorCell.style.cssText = locatorStyle;
+
+            if (locator) {
+                const wrapper = document.createElement('span');
+                wrapper.className = 'locator-wrapper';
+                const textSpan = document.createElement('span');
+                textSpan.className = 'locator-text';
+                textSpan.textContent = locator.locator;
+                wrapper.appendChild(textSpan);
+                wrapper.insertAdjacentHTML('beforeend', this._createWarningIcon(locator.warnings));
+                locatorCell.appendChild(wrapper);
+            } else {
+                locatorCell.textContent = '-';
+            }
+            row.appendChild(locatorCell);
+
+            const timeCell = document.createElement('td');
+            timeCell.className = `time-column ${this.showTimestamp ? '' : 'hidden'}`;
+            timeCell.textContent = this.lastMetadata?.timestamp || '-';
+            row.appendChild(timeCell);
+
+            const actionCellHtml = this._createActionCell(!locator);
+            row.insertAdjacentHTML('beforeend', actionCellHtml);
 
             tbody.appendChild(row);
 
@@ -2052,7 +2156,15 @@ const LocatorX = {
                 matchBadge.textContent = locator.matches;
 
                 const displayValue = this.formatLocator(locator.locator, type);
-                locatorCell.innerHTML = `<span class="locator-wrapper"> <span class="locator-text">${displayValue}</span>${this._createWarningIcon(locator.warnings)}</span > `;
+                locatorCell.innerHTML = '';
+                const wrapper = document.createElement('span');
+                wrapper.className = 'locator-wrapper';
+                const textSpan = document.createElement('span');
+                textSpan.className = 'locator-text';
+                textSpan.textContent = displayValue;
+                wrapper.appendChild(textSpan);
+                wrapper.insertAdjacentHTML('beforeend', this._createWarningIcon(locator.warnings));
+                locatorCell.appendChild(wrapper);
 
                 // Store raw locator for copy/save actions if needed, or we copy formatted? 
                 // Usually user wants to copy the code.

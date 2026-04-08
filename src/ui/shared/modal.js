@@ -74,8 +74,10 @@ class LocatorXModal {
             contentHtml += `<div style="margin-bottom: 8px; line-height: 1.5; color: var(--primary-text);">${options.message || ''}</div>`;
 
             if (options.type === 'prompt') {
+                const escapedValue = this._escapeHtml(options.value || '');
+                const escapedPlaceholder = this._escapeHtml(options.placeholder || '');
                 contentHtml += `
-                    <input type="text" class="modal-input" value="${options.value || ''}" placeholder="${options.placeholder || ''}" autofocus>
+                    <input type="text" class="modal-input" value="${escapedValue}" placeholder="${escapedPlaceholder}" autofocus>
                 `;
             }
 
@@ -107,6 +109,16 @@ class LocatorXModal {
             this.resolvePromise(value);
             this.resolvePromise = null;
         }
+    }
+
+    _escapeHtml(unsafe) {
+        if (typeof unsafe !== 'string') return unsafe;
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
     }
 
     // Public API matching native functions

@@ -1,4 +1,7 @@
-## 2024-05-24 - Cross-Site Scripting (XSS) Vulnerability in Autocomplete Dropdown
-**Vulnerability:** A Cross-Site Scripting (XSS) vulnerability was found in the autocomplete dropdown UI component in `src/ui/shared/panel-controller.js`. The `renderDropdown` method was constructing HTML strings using raw user input (`text`, `query`, and `suggestedLocator`) without escaping them and inserting the strings directly into the DOM via `innerHTML`.
-**Learning:** This existed because the codebase was likely focused on string formatting (e.g., adding `<strong>` tags to highlight matching search terms) and did not include a general-purpose HTML sanitization utility to process variables before rendering.
-**Prevention:** Always sanitize data fetched from external inputs, page content, or auto-generated fields before injecting it into the DOM. A new `LocatorX.utils.escapeHtml` utility function was added and should be strictly used when inserting dynamic variables into strings that are subsequently assigned to `innerHTML`.
+## 2025-05-22 - Fix DOM XSS in POM Cell Value Rendering
+
+**Vulnerability:** DOM-based Cross-Site Scripting (XSS) via innerHTML interpolation.
+
+**Learning:** Dynamic data, such as locator values, indices, and timestamps, were being directly interpolated into innerHTML strings in panel-controller.js and modal.js. This allowed potentially malicious content to be executed as script if injected into those values.
+
+**Prevention:** Always use secure DOM manipulation methods like document.createElement() and textContent to handle dynamic data. If HTML structure must be partially dynamic, use insertAdjacentHTML for static parts and sanitize any dynamic content using the LocatorX.utils.escapeHtml utility. For standalone components like LocatorXModal, include a dedicated escaping helper.
