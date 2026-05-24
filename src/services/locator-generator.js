@@ -60,61 +60,42 @@ class LocatorGenerator {
 
     generateAxesXPath(anchor, target) {
         if (!anchor || !target) return null;
-
-        // 1. Determine relationship
-        let relationship = '';
-        let axis = '';
-
         if (anchor === target) return 'self::*';
 
-        // Check for Ancestor/Descendant
-        if (anchor.contains(target)) {
-            relationship = 'descendant';
-            axis = 'descendant';
-        } else if (target.contains(anchor)) {
-            relationship = 'ancestor';
-            axis = 'ancestor';
-        } else {
-            // Check for Siblings or General Preceding/Following
-            // Use compareDocumentPosition bitmask
-            const comparison = anchor.compareDocumentPosition(target);
+        // 1. Find Closest Common Ancestor (CCA)
+        let cca = anchor.parentNode;
+        while (cca && !cca.contains(target)) {
+            cca = cca.parentNode;
+        }
 
-            if (comparison & Node.DOCUMENT_POSITION_FOLLOWING) {
-                // Target is after Anchor
-                if (anchor.parentNode === target.parentNode) {
-                    axis = 'following-sibling';
-                } else {
-                    axis = 'following';
-                }
-            } else if (comparison & Node.DOCUMENT_POSITION_PRECEDING) {
-                // Target is before Anchor
-                if (anchor.parentNode === target.parentNode) {
-                    axis = 'preceding-sibling';
-                } else {
-                    axis = 'preceding';
-                }
-            }
+        if (!cca) return null; 
+
+        // 2. Generate Anchor XPath
+        const anchorXpath = this.generateRelativeXPath(anchor);
+
+        // 3. Determine Axis
+        let axis = '';
+        const comparison = anchor.compareDocumentPosition(target);
+
+        if (comparison & Node.DOCUMENT_POSITION_CONTAINED_BY) {
+            axis = 'descendant';
+        } else if (comparison & Node.DOCUMENT_POSITION_CONTAINS) {
+            axis = 'ancestor';
+        } else if (comparison & Node.DOCUMENT_POSITION_FOLLOWING) {
+            axis = (anchor.parentNode === target.parentNode) ? 'following-sibling' : 'following';
+        } else if (comparison & Node.DOCUMENT_POSITION_PRECEDING) {
+            axis = (anchor.parentNode === target.parentNode) ? 'preceding-sibling' : 'preceding';
         }
 
         if (!axis) return null;
 
-        // Generate Anchor XPath (Relative or ID-based)
-        const anchorXpath = this.generateRelativeXPath(anchor);
-
-        // Generate Target Selector relative to axis
-        // We want something like: //anchor/axis::target
-
         const targetTag = target.tagName.toLowerCase();
         let targetPredicate = '';
 
-        // Try to identify target uniquely within that axis if possible
-        // For simplicity, we'll try ID, then Text, then Class, then Index
-
-        if (target.id) {
+        if (target.id && !this.looksDynamic(target.id)) {
             const quote = target.id.includes("'") ? '"' : "'";
             targetPredicate = `[@id=${quote}${target.id}${quote}]`;
         } else {
-            // Text Match
             const text = target.textContent?.trim();
             if (text && text.length > 0 && text.length < 50) {
                 const quote = text.includes("'") ? '"' : "'";
@@ -128,10 +109,19 @@ class LocatorGenerator {
             }
         }
 
-        // If no specific predicate, maybe use index? 
-        // Indexing relative to axis can be tricky.
+        let xpath = `${anchorXpath}/${axis}::${targetTag}${targetPredicate}`;
+        
+        // Uniqueness check
+        const matches = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+        if (matches.snapshotLength > 1) {
+            for (let i = 0; i < matches.snapshotLength; i++) {
+                if (matches.snapshotItem(i) === target) {
+                    xpath = `(${xpath})[${i + 1}]`;
+                    break;
+                }
+            }
+        }
 
-        const xpath = `${anchorXpath}/${axis}::${targetTag}${targetPredicate}`;
         return xpath;
     }
 
@@ -298,23 +288,27 @@ class LocatorGenerator {
     }
 
     looksDynamic(value) {
-        if (!value) return false;
+        if (!value || typeof value !== 'string') return false;
+        if (value.length < 5) return false;
 
-        // 1. Contains numbers (existing logic)
+        // 1. Contains numbers with patterns
         if (/\d/.test(value)) {
             if (/[-_:]\d+/.test(value)) return true; // user-123
             if (/^\d+$/.test(value)) return true; // pure numbers
+            if (/[a-z]\d[a-z\d]{2,}/i.test(value)) return true; // alphanumeric hash e.g. a1b2
         }
 
         // 2. High Entropy / Long Strings (Non-numeric dynamic)
-        // e.g. "a8f9e2b1", "xy-zw-ab", UUIDs
-        if (value.length > 30) return true; // Very long IDs are usually generated
+        if (value.length > 30) return true; 
 
         // 3. Hexadecimal patterns (often UUIDs or hashes)
         if (value.length > 8 && /^[a-f0-9-]+$/i.test(value)) {
-            // If it's pure hex/dash and fairly long, likely a hash
             return true;
         }
+
+        // 4. Common Dynamic Prefixes/Suffixes
+        const suspects = ['ctl00', 'btn-', 'id-', 'ext-gen', 'ember', 'react-'];
+        if (suspects.some(s => value.toLowerCase().includes(s))) return true;
 
         return false;
     }

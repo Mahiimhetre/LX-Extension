@@ -5,6 +5,12 @@ const LocatorX = {
     core: null,
     modal: null,
     evaluator: null,
+    lastMetadata: null,
+    lastLocators: [],
+    lastLocatorTime: 0,
+    lastElementInfo: null,
+    lastElementType: null,
+    _port: null,
 
     notifications: {
         show(message, type = 'info', duration = 3000) {
@@ -270,6 +276,57 @@ const LocatorX = {
             // Flip if space below is too small AND space above is better
             if (spaceBelow < threshold && spaceAbove > spaceBelow) { dropdown.classList.add('drop-up'); }
             else { dropdown.classList.remove('drop-up'); }
+        },
+
+        // --- NEW CONSOLIDATED BROWSER HELPERS ---
+
+        /**
+         * Broadcasts a message to the active tab, optionally targeting all frames.
+         * Consolidates: chrome.tabs.query + chrome.webNavigation.getAllFrames + message loop.
+         */
+        broadcastToTab(action, payload = {}, options = {}) {
+            return new Promise((resolve) => {
+                chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                    const tab = tabs[0];
+                    if (!tab || !tab.id) return resolve([]);
+
+                    if (options.allFrames) {
+                        chrome.webNavigation.getAllFrames({ tabId: tab.id }, (frames) => {
+                            if (!frames || frames.length === 0) {
+                                chrome.tabs.sendMessage(tab.id, { action, ...payload }, (res) => resolve(res ? [res] : []));
+                                return;
+                            }
+
+                            let results = [];
+                            let pending = frames.length;
+                            frames.forEach(frame => {
+                                chrome.tabs.sendMessage(tab.id, { action, ...payload }, { frameId: frame.frameId }, (res) => {
+                                    if (!chrome.runtime.lastError && res) results.push(res);
+                                    pending--;
+                                    if (pending === 0) resolve(results);
+                                });
+                            });
+                        });
+                    } else {
+                        chrome.tabs.sendMessage(tab.id, { action, ...payload }, (res) => resolve(res ? [res] : []));
+                    }
+                });
+            });
+        },
+
+        /**
+         * Async wrapper for chrome.storage.local.get to avoid nested callbacks.
+         */
+        getConfig(keys, defaultValues = {}) {
+            return new Promise((resolve) => {
+                chrome.storage.local.get(keys, (result) => {
+                    const merged = { ...defaultValues };
+                    Object.keys(result).forEach(k => {
+                        if (result[k] !== undefined) merged[k] = result[k];
+                    });
+                    resolve(merged);
+                });
+            });
         }
     },
 
@@ -277,9 +334,9 @@ const LocatorX = {
     pom: {
         currentPageId: null,
 
-        init() {
+        async init() {
             this.setupEventListeners();
-            this.loadPages();
+            await this.loadPages();
         },
 
         setupEventListeners() {
@@ -303,8 +360,8 @@ const LocatorX = {
                 });
             }
         },
-        loadPages() {
-            const pages = LocatorX.core.getPOMPages();
+        async loadPages() {
+            const pages = await LocatorX.core.getPOMPages();
             const select = document.getElementById('pomPageSelect');
             if (!select) return;
 
@@ -320,9 +377,12 @@ const LocatorX = {
             // Restore last selected page or default
             if (this.currentPageId && pages.find(p => p.id === this.currentPageId)) {
                 select.value = this.currentPageId;
-                this.updateUI(this.currentPageId);
-            } else if (pages.length > 0) { this.switchPage(pages[0].id); }
-            else { this.updateUI(null); }
+                await this.updateUI(this.currentPageId);
+            } else if (pages.length > 0) {
+                await this.switchPage(pages[0].id);
+            } else {
+                await this.updateUI(null);
+            }
         },
 
 
@@ -340,16 +400,16 @@ const LocatorX = {
                 locators: []
             };
 
-            LocatorX.core.savePOMPage(newPage);
-            this.loadPages();
-            this.switchPage(newPage.id);
+            await LocatorX.core.savePOMPage(newPage);
+            await this.loadPages();
+            await this.switchPage(newPage.id);
             return newPage;
         },
 
         async renamePage() {
             if (!this.currentPageId) return;
 
-            const pages = LocatorX.core.getPOMPages();
+            const pages = await LocatorX.core.getPOMPages();
             const page = pages.find(p => p.id === this.currentPageId);
             if (!page) return;
 
@@ -361,14 +421,14 @@ const LocatorX = {
             if (!newName || newName === page.name) return;
 
             page.name = newName;
-            LocatorX.core.savePOMPage(page);
-            this.loadPages();
+            await LocatorX.core.savePOMPage(page);
+            await this.loadPages();
         },
 
         async deletePage() {
             if (!this.currentPageId) return;
 
-            const pages = LocatorX.core.getPOMPages();
+            const pages = await LocatorX.core.getPOMPages();
             const page = pages.find(p => p.id === this.currentPageId);
             const pageName = page ? page.name : 'this page';
 
@@ -382,33 +442,33 @@ const LocatorX = {
             const deletedPageId = this.currentPageId;
             const deletedPage = JSON.parse(JSON.stringify(page));
 
-            LocatorX.core.deletePOMPage(this.currentPageId);
+            await LocatorX.core.deletePOMPage(this.currentPageId);
             this.currentPageId = null;
-            this.loadPages();
+            await this.loadPages();
 
-            LocatorX.notifications.undoable(`Deleted POM page "${pageName}"`, () => {
-                LocatorX.core.savePOMPage(deletedPage);
-                this.loadPages();
-                this.switchPage(deletedPageId);
+            LocatorX.notifications.undoable(`Deleted POM page "${pageName}"`, async () => {
+                await LocatorX.core.savePOMPage(deletedPage);
+                await this.loadPages();
+                await this.switchPage(deletedPageId);
             });
         },
 
-        switchPage(pageId) {
+        async switchPage(pageId) {
             this.currentPageId = pageId;
             const select = document.getElementById('pomPageSelect');
             if (select) select.value = pageId;
 
-            this.updateUI(pageId);
+            await this.updateUI(pageId);
         },
 
-        getCurrentPage() {
+        async getCurrentPage() {
             if (!this.currentPageId) return null;
-            const pages = LocatorX.core.getPOMPages();
+            const pages = await LocatorX.core.getPOMPages();
             return pages.find(p => p.id === this.currentPageId);
         },
 
-        addLocatorToPage(locator) {
-            const page = this.getCurrentPage();
+        async addLocatorToPage(locator) {
+            const page = await this.getCurrentPage();
             if (!page) {
                 LocatorX.notifications.warning('Please select or create a page first.');
                 return;
@@ -419,11 +479,11 @@ const LocatorX = {
             if (exists) return; // Silent return or notify
 
             page.locators.push(locator);
-            LocatorX.core.savePOMPage(page);
-            this.updateUI(this.currentPageId);
+            await LocatorX.core.savePOMPage(page);
+            await this.updateUI(this.currentPageId);
         },
 
-        updateUI(pageId) {
+        async updateUI(pageId) {
             const editBtn = document.getElementById('editPageBtn');
             const deleteBtn = document.getElementById('deletePageBtn');
             const tableBody = document.querySelector('.pom-table tbody');
@@ -439,11 +499,11 @@ const LocatorX = {
             if (deleteBtn) deleteBtn.classList.remove('disabled');
 
             // Render Table
-            this.renderTable(pageId);
+            await this.renderTable(pageId);
         },
 
-        renderTable(pageId) {
-            const pages = LocatorX.core.getPOMPages();
+        async renderTable(pageId) {
+            const pages = await LocatorX.core.getPOMPages();
             const page = pages.find(p => p.id === pageId);
             if (!page || !page.locators) return;
 
@@ -455,7 +515,7 @@ const LocatorX = {
             let structure = LocatorX.filters.pomStructure;
             if (!structure) {
                 // Fallback if updatePOMTable hasn't run yet
-                LocatorX.filters.updatePOMTable();
+                await LocatorX.filters.updatePOMTable();
                 structure = LocatorX.filters.pomStructure;
             }
 
@@ -559,28 +619,26 @@ const LocatorX = {
             });
         },
 
-        deleteLocator(row) {
-            // row ends up being the TR.
-            // But we need the index relative to the body, or we can rely on rowIndex (minus header).
+        async deleteLocator(row) {
             const tbody = row.parentElement;
             const index = Array.from(tbody.children).indexOf(row);
 
             if (index === -1) return;
 
-            const page = this.getCurrentPage();
+            const page = await this.getCurrentPage();
             if (page && page.locators) {
                 const deletedLocator = JSON.parse(JSON.stringify(page.locators[index]));
 
                 page.locators.splice(index, 1);
-                LocatorX.core.savePOMPage(page);
-                this.renderTable(page.id);
+                await LocatorX.core.savePOMPage(page);
+                await this.renderTable(page.id);
 
-                LocatorX.notifications.undoable('Deleted POM entry', () => {
-                    const currentPage = this.getCurrentPage();
+                LocatorX.notifications.undoable('Deleted POM entry', async () => {
+                    const currentPage = await this.getCurrentPage();
                     if (currentPage && currentPage.id === page.id) {
                         currentPage.locators.splice(index, 0, deletedLocator);
-                        LocatorX.core.savePOMPage(currentPage);
-                        this.renderTable(currentPage.id);
+                        await LocatorX.core.savePOMPage(currentPage);
+                        await this.renderTable(currentPage.id);
                     }
                 });
             }
@@ -689,7 +747,7 @@ const LocatorX = {
     dynamicView: {
         lastTab: 'home',
 
-        show(title, content) {
+        async show(title, content) {
             this.lastTab = LocatorX.tabs.current !== 'dynamic' ? LocatorX.tabs.current : 'home';
 
             const titleEl = document.getElementById('dynamicTitle');
@@ -698,7 +756,7 @@ const LocatorX = {
             if (titleEl) titleEl.textContent = title;
             if (contentEl) contentEl.innerHTML = content;
 
-            LocatorX.tabs.switch('dynamic');
+            await LocatorX.tabs.switch('dynamic');
         },
 
         hide() {
@@ -1168,7 +1226,7 @@ const LocatorX = {
 
                 row.innerHTML = `
                     <td>${index + 1}</td>
-                    <td><span class="match-count" id="${matchId}" data-count="..."></span></td>
+                    <td><span class="match-count" id="${matchId}" data-count="...">...</span></td>
                     <td class="lx-editable ms-type-cell">${LocatorX.utils.escapeHtml(type)}</td>
                     <td class="lx-editable">${LocatorX.utils.escapeHtml(locator)}</td>
                     <td>
@@ -1182,58 +1240,56 @@ const LocatorX = {
                     LocatorX.utils.copyToClipboard(locator);
                     LocatorX.notifications.success('Locator copied!');
                 });
+            });
 
-                // Validate
-                this.validateMatch(locator, type, matchId);
+            // Trigger Batch Validation
+            this.batchValidateMatches(matches);
+        },
+
+        async batchValidateMatches(matches) {
+            if (!matches || matches.length === 0) return;
+
+            const items = matches.map(m => ({
+                id: m.index !== undefined ? `ms-match-${m.index}` : m.id,
+                selector: m.locator,
+                type: m.type
+            }));
+
+            // Use unified broadcaster for ALL frames
+            const allFrameResults = await LocatorX.utils.broadcastToTab('batchEvaluate', { items }, { allFrames: true });
+            
+            this._finalizeBatchResults(items, allFrameResults);
+        },
+
+        _finalizeBatchResults(items, allFrameResults) {
+            items.forEach(async (item) => {
+                let totalCount = 0;
+                let autoSuggestion = null;
+
+                allFrameResults.forEach(frameResults => {
+                    if (frameResults.results) {
+                        const res = frameResults.results.find(r => r.id === item.id);
+                        if (res) {
+                            totalCount += res.count || 0;
+                            if (res.suggestion && !autoSuggestion) autoSuggestion = res.suggestion;
+                        }
+                    }
+                });
+
+                LocatorX.utils._updateBadge(item.id, totalCount);
+
+                if (autoSuggestion && autoSuggestion !== item.selector) {
+                    const config = await LocatorX.utils.getConfig(['smartCorrectEnabled'], { smartCorrectEnabled: true });
+                    if (config.smartCorrectEnabled !== false) {
+                        this._applyAutoCorrection(item.id, autoSuggestion);
+                    }
+                }
             });
         },
 
         validateMatch(locator, type, matchId) {
-            let totalCount = 0;
-            let suggestion = null;
-            let updated = false;
-
-            chrome.storage.local.get(['smartCorrectEnabled'], (result) => {
-                const enableSmartCorrect = result.smartCorrectEnabled !== undefined ? result.smartCorrectEnabled : true;
-
-                chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-                    const tab = tabs[0];
-                    if (tab && tab.id) {
-                        chrome.webNavigation.getAllFrames({ tabId: tab.id }, (frames) => {
-                            let pending = frames ? frames.length : 0;
-                            if (!frames || frames.length === 0) {
-                                this._sendValidateMessage(tab.id, null, locator, type, matchId, (c) => LocatorX.utils._updateBadge(matchId, c));
-                                return;
-                            }
-                            frames.forEach(frame => {
-                                chrome.tabs.sendMessage(tab.id, {
-                                    action: 'evaluateSelector',
-                                    selector: locator,
-                                    type: type,
-                                    enableSmartCorrect: enableSmartCorrect
-                                }, { frameId: frame.frameId }, (status) => {
-                                    // Accumulate success responses
-                                    if (!chrome.runtime.lastError && status) {
-                                        if (status.count) totalCount += status.count;
-                                        if (status.suggestedLocator) suggestion = status.suggestedLocator;
-                                    }
-
-                                    pending--;
-                                    if (pending <= 0 && !updated) {
-                                        updated = true;
-                                        LocatorX.utils._updateBadge(matchId, totalCount);
-
-                                        // Handle Auto-Correction (UI Update)
-                                        if (suggestion && suggestion !== locator) {
-                                            this._applyAutoCorrection(matchId, suggestion);
-                                        }
-                                    }
-                                });
-                            });
-                        });
-                    }
-                });
-            });
+            // Simplified: Now just a wrapper for a single-item batch
+            this.batchValidateMatches([{ id: matchId, locator, type }]);
         },
 
 
@@ -1259,16 +1315,118 @@ const LocatorX = {
             }
         },
 
-        _sendValidateMessage(tabId, frameId, locator, type, matchId, callback) {
-            const opts = frameId !== null ? { frameId } : {};
-            chrome.tabs.sendMessage(tabId, {
-                action: 'evaluateSelector',
-                selector: locator,
-                type: type
-            }, opts, (status) => {
-                const count = (!chrome.runtime.lastError && status) ? status.count : 0;
-                callback(count);
+    },
+
+    // Tab State Management
+    stateManager: {
+        lastTabId: null,
+
+        init() {
+            // Listen for tab changes from background
+            chrome.runtime.onMessage.addListener((message) => {
+                if (message.action === 'activeTabChanged') {
+                    this.handleTabChange(message.tabId, message.state);
+                }
             });
+
+            // Initial load state for current tab
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                const tab = tabs[0];
+                if (tab && tab.id) {
+                    this.lastTabId = tab.id;
+                    chrome.runtime.sendMessage({ action: 'getTabState', tabId: tab.id }, (response) => {
+                        if (response && response.state) {
+                            this.restoreState(response.state);
+                        }
+                    });
+                }
+            });
+
+            // Periodically save state (every 3 seconds if active)
+            setInterval(() => this.checkpoint(), 3000);
+        },
+
+        handleTabChange(tabId, state) {
+            // Prevent redundant restores if we already tracked this change
+            if (this.lastTabId === tabId) return;
+            this.lastTabId = tabId;
+
+            if (state) {
+                this.restoreState(state);
+            } else {
+                this.resetUI();
+            }
+        },
+
+        restoreState(state) {
+            if (!state) return;
+
+            // 1. Search UI
+            const searchInput = document.querySelector('.search-input');
+            if (searchInput && state.searchQuery !== undefined) {
+                searchInput.value = state.searchQuery;
+            }
+
+            // 2. Results Table
+            if (state.lastLocators) {
+                LocatorX.filters.displayGeneratedLocators(
+                    state.lastLocators,
+                    state.lastElementInfo,
+                    state.lastElementType,
+                    state.lastMetadata
+                );
+            }
+
+            // 3. Match Count for search bar (if exists)
+            if (state.searchMatchCount !== undefined) {
+                const searchBadge = document.getElementById('searchMatchBadge');
+                if (searchBadge) {
+                    searchBadge.textContent = state.searchMatchCount;
+                    searchBadge.classList.toggle('hidden', state.searchMatchCount === 0);
+                }
+            }
+
+            // 4. Inspection State
+            if (state.inspecting) {
+                if (!LocatorX.inspect.isActive) LocatorX.inspect.activate();
+            } else {
+                if (LocatorX.inspect.isActive) LocatorX.inspect.deactivate();
+            }
+        },
+
+        resetUI() {
+            const searchInput = document.querySelector('.search-input');
+            if (searchInput) searchInput.value = '';
+
+            const searchBadge = document.getElementById('searchMatchBadge');
+            if (searchBadge) searchBadge.classList.add('hidden');
+
+            LocatorX.filters.displayGeneratedLocators([], 'No element selected', null, null);
+            if (LocatorX.inspect.isActive) LocatorX.inspect.deactivate();
+        },
+
+        checkpoint() {
+            if (!this.lastTabId) return;
+
+            const searchInput = document.querySelector('.search-input');
+            const searchBadge = document.getElementById('searchMatchBadge');
+
+            const state = {
+                searchQuery: searchInput ? searchInput.value : '',
+                searchMatchCount: searchBadge ? parseInt(searchBadge.textContent) : 0,
+                lastLocators: LocatorX.filters.lastLocators || [],
+                lastElementInfo: LocatorX.filters.lastElementInfo || 'No element selected',
+                lastElementType: LocatorX.filters.lastElementType || null,
+                lastMetadata: LocatorX.filters.lastMetadata || null,
+                inspecting: LocatorX.inspect.isActive,
+                activeTab: LocatorX.tabs.current
+            };
+
+            chrome.runtime.sendMessage({
+                action: 'saveTabState',
+                tabId: this.lastTabId,
+                state: state
+            }).catch(() => { });
         }
     },
 
@@ -1277,25 +1435,25 @@ const LocatorX = {
         current: 'light',
         rotation: 0,
 
-        init() {
-            this.load();
+        async init() {
+            await this.load();
             document.getElementById('themeBtn').addEventListener('click', () => this.toggle());
         },
 
-        toggle() {
+        async toggle() {
             this.current = this.current === 'light' ? 'dark' : 'light';
             this.rotation += 180;
             document.getElementById('themeBtn').style.transform = `rotate(${this.rotation}deg)`;
             this.apply();
-            localStorage.setItem('locator-x-theme', this.current);
+            await LocatorX.core.setTheme(this.current);
         },
 
         apply() {
             document.body.classList.toggle('dark-theme', this.current === 'dark');
         },
 
-        load() {
-            this.current = localStorage.getItem('locator-x-theme') || 'light';
+        async load() {
+            this.current = await LocatorX.core.getTheme();
             this.apply();
         }
     },
@@ -1405,16 +1563,15 @@ const LocatorX = {
             }
         },
 
-        loadFiltersFromStorage() {
-            chrome.storage.local.get(['enabledFilters'], (result) => {
-                if (result.enabledFilters && result.enabledFilters.length > 0) {
-                    // Set checkboxes based on stored filters
-                    document.querySelectorAll('.loc-type, .nested-loc-type').forEach(cb => {
-                        cb.checked = result.enabledFilters.includes(cb.id);
-                    });
-                    this.updateNestedIcon();
-                }
-            });
+        async loadFiltersFromStorage() {
+            const enabledFilters = await LocatorX.core.getEnabledFilters();
+            if (enabledFilters && enabledFilters.length > 0) {
+                // Set checkboxes based on stored filters
+                document.querySelectorAll('.loc-type, .nested-loc-type').forEach(cb => {
+                    cb.checked = enabledFilters.includes(cb.id);
+                });
+                this.updateNestedIcon();
+            }
         },
 
         saveCurrentFilters(tab) {
@@ -1610,7 +1767,7 @@ const LocatorX = {
                         'Are you sure you want to reset all settings to defaults?',
                         { icon: 'bi-exclamation-triangle-fill' }
                     );
-                    if (confirmed) this.reset();
+                    if (confirmed) await this.reset();
                 });
             }
         },
@@ -1623,8 +1780,7 @@ const LocatorX = {
                 'showTimestamp',
                 'smartCorrectEnabled',
                 'maxMatchLimit',
-                'locator-x-theme',
-                'persistentInspectEnabled'
+                'locator-x-theme'
             ];
 
             // Clear Chrome Local Storage
@@ -1632,8 +1788,8 @@ const LocatorX = {
 
             // Clear LocalStorage settings specifically (fallback/sync)
             localStorage.removeItem('locator-x-theme');
-            localStorage.removeItem('locator-x-settings'); 
-            
+            localStorage.removeItem('locator-x-settings');
+
             // 2. RESTORE UI DEFAULTS
             // Framework
             const fwSelect = document.getElementById('frameworkSelect');
@@ -1642,7 +1798,7 @@ const LocatorX = {
             // Filters (Default: All CORE checked)
             const allCores = LocatorXConfig.FILTER_GROUPS.CORE;
             const coreDomIds = allCores.map(key => this.FILTER_ID_MAP[key]).filter(id => id);
-            
+
             document.querySelectorAll('.loc-type, .nested-loc-type').forEach(cb => {
                 cb.checked = coreDomIds.includes(cb.id);
                 cb.disabled = false;
@@ -1662,8 +1818,6 @@ const LocatorX = {
             const smartCorrectCfg = document.getElementById('smartCorrectCfg');
             if (smartCorrectCfg) smartCorrectCfg.checked = true;
 
-            const persistentInspectCfg = document.getElementById('persistentInspectCfg');
-            if (persistentInspectCfg) persistentInspectCfg.checked = false;
 
             const maxMatchLimitCfg = document.getElementById('maxMatchLimitCfg');
             if (maxMatchLimitCfg) maxMatchLimitCfg.value = 150;
@@ -2168,61 +2322,18 @@ const LocatorX = {
         },
 
         formatLocator(locatorValue, type) {
-            const patternInput = document.getElementById('codeModeInput');
-            if (!patternInput) return locatorValue;
+            if (typeof LocatorXPatterns === 'undefined') return locatorValue;
 
-            let pattern = patternInput.value.trim();
-            if (!pattern) return locatorValue;
+            const framework = document.getElementById('frameworkSelect') ? document.getElementById('frameworkSelect').value : 'selenium-java';
+            // We assume the first pattern in the framework is the "default" for table display
+            // unless we add specific pattern selection to the table rows later.
+            const frameworkPatterns = LocatorXPatterns.getPatterns(framework);
+            if (!frameworkPatterns || frameworkPatterns.length === 0) return locatorValue;
 
-            // Smart Strategy Replacement
-            const strategyMap = {
-                'ID': { camel: 'id', pascal: 'Id', upper: 'ID', by: 'id' },
-                'Name': { camel: 'name', pascal: 'Name', upper: 'NAME', by: 'name' },
-                'ClassName': { camel: 'className', pascal: 'ClassName', upper: 'CLASS_NAME', by: 'className' },
-                'TagName': { camel: 'tagName', pascal: 'TagName', upper: 'TAG_NAME', by: 'tagName' },
-                'CSS': { camel: 'cssSelector', pascal: 'CssSelector', upper: 'CSS_SELECTOR', by: 'cssSelector' },
-                'Link Text': { camel: 'linkText', pascal: 'LinkText', upper: 'LINK_TEXT', by: 'linkText' },
-                'Partial Link Text': { camel: 'partialLinkText', pascal: 'PartialLinkText', upper: 'PARTIAL_LINK_TEXT', by: 'partialLinkText' },
-                'Absolute XPath': { camel: 'xpath', pascal: 'Xpath', upper: 'XPATH', by: 'xpath' },
-                'Relative XPath': { camel: 'xpath', pascal: 'Xpath', upper: 'XPATH', by: 'xpath' },
-                'default': { camel: 'xpath', pascal: 'Xpath', upper: 'XPATH', by: 'xpath' }
-            };
-
-            const strategy = strategyMap[type] || (type.includes('XPath') ? strategyMap['Relative XPath'] : strategyMap['default']);
-
-            // 1. Handle By.{type} / By.{TYPE}
-            if (pattern.includes('By.{type}')) {
-                pattern = pattern.replace('By.{type}', `By.${strategy.by}`);
-            } else if (pattern.includes('By.{TYPE}')) {
-                pattern = pattern.replace('By.{TYPE}', `By.${strategy.upper}`);
-            }
-
-            // 2. Handle @FindBy({type}="{value}") or {type}="{value}"
-            if (pattern.includes('{type}=')) {
-                const findByKey = type === 'CSS' ? 'css' : strategy.camel;
-                pattern = pattern.replace('{type}=', `${findByKey}=`);
-            }
-
-            // 3. Handle Legacy / Manual Typed Patterns
-            if (pattern.includes('By.type')) pattern = pattern.replace('By.type', `By.${strategy.by}`);
-            if (pattern.includes('By.TYPE')) pattern = pattern.replace('By.TYPE', `By.${strategy.upper}`);
-            if (pattern.includes('type=')) {
-                const findByKey = type === 'CSS' ? 'css' : strategy.camel;
-                pattern = pattern.replace('type=', `${findByKey}=`);
-            }
-            if (pattern.includes('By.xpath')) pattern = pattern.replace('By.xpath', `By.${strategy.by}`);
-            if (pattern.includes('By.XPATH')) pattern = pattern.replace('By.XPATH', `By.${strategy.upper}`);
-            if (pattern.includes('xpath=')) {
-                const findByKey = type === 'CSS' ? 'css' : strategy.camel;
-                pattern = pattern.replace('xpath=', `${findByKey}=`);
-            }
-
-            // Replace value placeholders
-            pattern = pattern.replace(/xpathvalue/g, locatorValue);
-            pattern = pattern.replace(/{value}/g, locatorValue); // Explicitly replace {value}
-
-            // Clean 'value' if it wasn't part of {value} (simple fallback for manual typing)
-            return pattern.replace(/value/g, locatorValue);
+            // Strategy mapping to match Pattern terminology
+            const standardType = type === 'ClassName' ? 'className' : type === 'TagName' ? 'tagName' : type.toLowerCase();
+            
+            return LocatorXPatterns.generate(framework, frameworkPatterns[0].id, standardType, locatorValue);
         },
 
         _createMatchCell(count, id = '') {
@@ -2316,9 +2427,9 @@ const LocatorX = {
             }
         },
 
-        handlePOMDisplay(locators, metadata = null) {
+        async handlePOMDisplay(locators, metadata = null) {
             // Check if page selected
-            let currentPage = LocatorX.pom.getCurrentPage();
+            let currentPage = await LocatorX.pom.getCurrentPage();
 
             // Auto-create page if none exists or none selected
             if (!currentPage) {
@@ -2327,7 +2438,7 @@ const LocatorX = {
                     'Page 1',
                     'No pages exist yet. Enter a name to create your first POM page:'
                 )
-                    .then(name => {
+                    .then(async name => {
                         if (name) {
                             // Create page manually to get the ID and object
                             const newPage = {
@@ -2335,28 +2446,26 @@ const LocatorX = {
                                 name: name,
                                 locators: []
                             };
-                            LocatorX.core.savePOMPage(newPage);
-                            LocatorX.pom.loadPages();
-                            LocatorX.pom.switchPage(newPage.id);
+                            await LocatorX.core.savePOMPage(newPage);
+                            await LocatorX.pom.loadPages();
+                            await LocatorX.pom.switchPage(newPage.id);
                             currentPage = newPage;
 
                             // Now add the locators
-                            this.addLocatorsToPage(currentPage, locators, metadata);
+                            await this.addLocatorsToPage(currentPage, locators, metadata);
                         }
                     });
                 return;
             }
 
-            this.addLocatorsToPage(currentPage, locators, metadata);
-            this.updatePOMTable();
+            await this.addLocatorsToPage(currentPage, locators, metadata);
+            await this.updatePOMTable();
         },
 
-        addLocatorsToPage(page, locators, metadata = null) {
+        async addLocatorsToPage(page, locators, metadata = null) {
             const tbody = document.querySelector('.pom-container .pom-table tbody');
             if (!tbody) return;
 
-            // Check for duplicates (existing logic)
-            // Handle both legacy (array) and new (object) structure
             const isDuplicate = page.locators.some(l => {
                 const existingLocators = Array.isArray(l) ? l : l.locators;
                 return JSON.stringify(existingLocators) === JSON.stringify(locators);
@@ -2372,10 +2481,10 @@ const LocatorX = {
                 locators,
                 timestamp: metadata?.timestamp || new Date().toLocaleTimeString('en-US', { hour12: false })
             });
-            LocatorX.core.savePOMPage(page);
+            await LocatorX.core.savePOMPage(page);
 
             // Re-render
-            LocatorX.pom.renderTable(page.id);
+            await LocatorX.pom.renderTable(page.id);
         },
 
         getEnabledFilterIds() {
@@ -2385,7 +2494,7 @@ const LocatorX = {
             return enabledIds;
         },
 
-        updatePOMTable() {
+        async updatePOMTable() {
             const table = document.querySelector('.pom-table');
             if (!table) return;
 
@@ -2440,7 +2549,7 @@ const LocatorX = {
 
             // 2. TRIGGER ROW UPDATE (re-render current page with new structure)
             if (LocatorX.pom && LocatorX.pom.currentPageId) {
-                LocatorX.pom.renderTable(LocatorX.pom.currentPageId);
+                await LocatorX.pom.renderTable(LocatorX.pom.currentPageId);
             }
         },
 
@@ -3029,7 +3138,6 @@ const LocatorX = {
         _isDeactivating: false,
         currentMode: 'home',
         trackedTabId: null,
-        persistentInspectActive: false,
 
 
         init() {
@@ -3044,7 +3152,6 @@ const LocatorX = {
                     }
                 });
             }
-            this.setupPersistentInspectSetting();
 
             // Listen for messages from content script
             chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -3062,35 +3169,6 @@ const LocatorX = {
                 } else if (message.action === 'deactivateInspect') {
                     // Handle ESC key and right-click deactivation from content script
                     this.deactivate();
-                } else if (message.action === 'activeTabChanged') {
-                    if (this.isActive) {
-                        chrome.tabs.get(message.tabId, (tab) => {
-                            if (chrome.runtime.lastError || !tab) return;
-                            chrome.windows.getCurrent((currentWin) => {
-                                if (chrome.runtime.lastError || !currentWin || tab.windowId !== currentWin.id) return;
-
-                                if (this.currentMode === 'axes') {
-                                    if (this.trackedTabId) {
-                                        chrome.tabs.sendMessage(this.trackedTabId, { action: 'stopScanning', force: true }).catch(() => { });
-                                    }
-                                    LocatorX.notifications.warn('Axes capture aborted: browser tab changed.');
-                                    this.trackedTabId = null;
-                                    this.deactivate();
-                                } else {
-                                    if (this.persistentInspectActive) {
-                                        // Keep active, skip deactivation
-                                        return;
-                                    }
-                                    if (this.trackedTabId) {
-                                        chrome.tabs.sendMessage(this.trackedTabId, { action: 'stopScanning', force: true }).catch(() => { });
-                                    }
-                                    this.trackedTabId = null;
-                                    this.deactivate();
-                                    LocatorX.notifications.warn('Inspection stopped: browser tab changed.');
-                                }
-                            });
-                        });
-                    }
                 } else if (message.action === 'tabNavigated') {
                     if (this.isActive && message.tabId === this.trackedTabId) {
                         this.trackedTabId = null;
@@ -3231,30 +3309,7 @@ const LocatorX = {
                 this._isDeactivating = false;
             }, 100);
         },
-        
-        setupPersistentInspectSetting() {
-            const configKey = 'persistentInspectEnabled';
-            const checkbox = document.getElementById('persistentInspectCfg');
-            if (checkbox) {
-                chrome.storage.local.get([configKey], (result) => {
-                    const enabled = result[configKey] || false;
-                    checkbox.checked = enabled;
-                    this.persistentInspectActive = enabled;
-                });
-                checkbox.addEventListener('change', (e) => {
-                    const enabled = e.target.checked;
-                    this.persistentInspectActive = enabled;
-                    chrome.storage.local.set({ [configKey]: enabled });
-                    // Inform content script if currently picking
-                    if (this.isActive && this.trackedTabId) {
-                        chrome.tabs.sendMessage(this.trackedTabId, {
-                            action: 'updateConfig',
-                            config: { persistentInspect: enabled }
-                        }).catch(() => {});
-                    }
-                });
-            }
-        },
+
 
         broadcastActionToTab(payload) {
             chrome.runtime.sendMessage({
@@ -3565,24 +3620,25 @@ const LocatorX = {
         if (typeof planService !== 'undefined') { await planService.init(); }
 
         this.tabs.init();
-        this.theme.init();
+        await this.theme.init();
         this.dropdowns.init();
 
         if (typeof planService !== 'undefined') { planService.applyUIGates(); } // Initialize features early to apply gates
 
         this.settings.init();
-        this.filters.init();
+        await this.filters.init();
         this.dependencies.init();
         this.search.init();
         this.multiScan.init();
-        this.pom.init();
+        await this.pom.init();
         this.table.init();
-        this.savedLocators.init();
+        await this.savedLocators.init();
         this.inspect.init();
 
         this.auth.init();
         this.conflict.init();
         this.accessibility.init();
+        this.stateManager.init();
 
         // Check site support
         if (typeof SiteSupport !== 'undefined') {
@@ -3604,16 +3660,16 @@ const LocatorX = {
 
     // Saved Locators Management
     savedLocators: {
-        init() {
-            this.updateDropdown();
+        async init() {
+            await this.updateDropdown();
             this.setupSavedActions();
         },
 
-        updateDropdown() {
+        async updateDropdown() {
             const dropdown = document.getElementById('aboutDropdown');
             if (!dropdown) return;
 
-            const saved = JSON.parse(localStorage.getItem('locator-x-saved') || '[]');
+            const saved = await LocatorX.core.getSavedLocators(LocatorX.activeProjectId);
 
             if (saved.length === 0) {
                 dropdown.innerHTML = `
@@ -3638,8 +3694,9 @@ const LocatorX = {
 
                 saved.forEach((item, index) => {
                     const typeClass = item.type ? item.type.toLowerCase().replace(/\s+/g, '-') : 'manual';
+                    const icon = (item.id) ? 'bi-trash' : 'bi-trash'; // Keep it simple
                     content += `
-                        <div class="saved-item" data-index="${index}">
+                        <div class="saved-item" data-index="${index}" data-id="${item.id}">
                             <div class="saved-main">
                                 <div class="saved-info">
                                     <span class="saved-name lx-editable" title="Double-click to rename" data-target="saved-name" data-index="${index}">${LocatorX.utils.escapeHtml(item.name)}</span>
@@ -3674,31 +3731,32 @@ const LocatorX = {
                 dropdown.removeEventListener('click', this.handleSavedClick);
 
                 // Add new listener with proper binding
-                this.handleSavedClick = (e) => {
+                this.handleSavedClick = async (e) => {
                     if (e.target.classList.contains('saved-copy') || e.target.closest('.saved-copy')) {
                         const item = e.target.closest('.saved-item');
                         const locator = item.querySelector('.saved-locator-code').textContent;
-                        LocatorX.utils.copyToClipboard(locator).then(success => {
-                            if (success) LocatorX.notifications.success('Copied!');
-                            else LocatorX.notifications.error('Failed to copy');
-                        });
+                        const success = await LocatorX.utils.copyToClipboard(locator);
+                        if (success) LocatorX.notifications.success('Copied!');
+                        else LocatorX.notifications.error('Failed to copy');
                     }
 
                     if (e.target.classList.contains('saved-delete') || e.target.closest('.saved-delete')) {
                         const item = e.target.closest('.saved-item');
                         const index = parseInt(item.dataset.index);
-                        const saved = JSON.parse(localStorage.getItem('locator-x-saved') || '[]');
+                        const saved = await LocatorX.core.getSavedLocators(LocatorX.activeProjectId);
                         const deletedLocator = saved[index];
+                        if (!deletedLocator) return;
 
-                        saved.splice(index, 1);
-                        localStorage.setItem('locator-x-saved', JSON.stringify(saved));
-                        this.updateDropdown();
+                        await LocatorX.core.deleteLocator(deletedLocator.id);
+                        await this.updateDropdown();
 
-                        LocatorX.notifications.undoable(`Deleted "${deletedLocator.name}"`, () => {
-                            const currentSaved = JSON.parse(localStorage.getItem('locator-x-saved') || '[]');
-                            currentSaved.splice(index, 0, deletedLocator);
-                            localStorage.setItem('locator-x-saved', JSON.stringify(currentSaved));
-                            this.updateDropdown();
+                        LocatorX.notifications.undoable(`Deleted "${deletedLocator.name}"`, async () => {
+                            await LocatorX.core.saveLocator({
+                                name: deletedLocator.name,
+                                type: deletedLocator.type,
+                                locator: deletedLocator.locator
+                            });
+                            await this.updateDropdown();
                         });
                     }
                 };
@@ -3725,14 +3783,13 @@ const LocatorX = {
                 saveBtn.addEventListener('click', async () => {
                     // FEATURE GATE: Check for Saved Locator Limit
                     if (typeof planService !== 'undefined') {
-                        const savedCount = (JSON.parse(localStorage.getItem('locator-x-saved') || '[]')).length;
+                        const saved = await LocatorX.core.getSavedLocators();
                         const limit = planService.getLimit('MAX_SAVED_LOCATORS');
                         // Only enforce limit when adding a new locator.
                         const locatorVal = searchInput.value.trim();
-                        const savedItems = JSON.parse(localStorage.getItem('locator-x-saved') || '[]');
-                        const exists = savedItems.some(item => item.locator === locatorVal);
+                        const exists = saved.some(item => item.locator === locatorVal);
 
-                        if (!exists && savedCount >= limit) {
+                        if (!exists && saved.length >= limit) {
                             planService._showUpgradePrompt('Saved Locator Limit Reached');
                             return;
                         }
@@ -3746,31 +3803,24 @@ const LocatorX = {
                         return;
                     }
 
-                    const saved = JSON.parse(localStorage.getItem('locator-x-saved') || '[]');
+                    const saved = await LocatorX.core.getSavedLocators();
                     const existing = saved.find(item => item.locator === locator);
 
                     if (existing) {
-                        // Check if existing has timestamp name (starts with date)
                         const isTimestampName = /^\d{4}-\d{2}-\d{2}/.test(existing.name);
-
                         if (isTimestampName) {
-                            // Direct rename without message
-                            if (!name) {
-                                name = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-                            }
+                            if (!name) name = LocatorX.core.generateAutoName();
                             existing.name = name;
-                            localStorage.setItem('locator-x-saved', JSON.stringify(saved));
+                            await LocatorX.core.saveLocator(name, existing.type, existing.locator);
                             LocatorX.notifications.success(`Locator renamed to "${name}"`);
                         } else {
-                            // Ask for rename confirmation
                             const rename = await LocatorX.modal.confirm(
                                 'Rename Locator',
                                 `Locator already exists as "${existing.name}". Do you want to rename it?`
                             );
                             if (rename) {
-                                if (!name) { name = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19); }
-                                existing.name = name;
-                                localStorage.setItem('locator-x-saved', JSON.stringify(saved));
+                                if (!name) name = LocatorX.core.generateAutoName();
+                                await LocatorX.core.saveLocator(name, existing.type, existing.locator);
                                 LocatorX.notifications.success(`Locator renamed to "${name}"`);
                             } else {
                                 LocatorX.notifications.info('Save cancelled');
@@ -3778,30 +3828,25 @@ const LocatorX = {
                             }
                         }
                     } else {
-                        // New locator
-                        if (!name) { name = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19); }
-
-                        // Auto-detect type
+                        if (!name) name = LocatorX.core.generateAutoName();
                         const type = LocatorX.table.detectLocatorType(locator);
-
-                        saved.push({
+                        const toSave = {
                             name,
                             type,
-                            locator,
-                            date: new Date().toISOString()
-                        });
-                        localStorage.setItem('locator-x-saved', JSON.stringify(saved));
+                            locator
+                        };
+                        await LocatorX.core.saveLocator(toSave);
                         LocatorX.notifications.success(`Locator saved as "${name}"`);
                     }
 
                     saveInput.value = '';
-                    LocatorX.savedLocators.updateDropdown();
+                    await LocatorX.savedLocators.updateDropdown();
                 });
             }
         },
 
         setupCopyButtons() {
-            document.addEventListener('click', (e) => {
+            document.addEventListener('click', async (e) => {
                 if (!e.target || !e.target.closest) return;
 
                 if (e.target.classList.contains('bi-clipboard')) {
@@ -3834,9 +3879,7 @@ const LocatorX = {
                     }
 
                     // Save with auto-generated name
-                    const savedName = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-                    const saved = JSON.parse(localStorage.getItem('locator-x-saved') || '[]');
-
+                    const saved = await LocatorX.core.getSavedLocators();
                     const isDuplicate = saved.some(item => item.locator === locator && item.type === type);
 
                     if (isDuplicate) {
@@ -3853,23 +3896,21 @@ const LocatorX = {
                         }
                     }
 
-                    // Auto-detect type if saving from table (though table usually has type) If type is empty or 'Manual', try to detect
                     if (!type || type === 'Manual') { type = this.detectLocatorType(locator); }
 
-                    saved.push({
-                        name: savedName,
+                    const autoName = LocatorX.core.generateAutoName();
+                    await LocatorX.core.saveLocator({
+                        name: autoName,
                         type,
-                        locator,
-                        date: new Date().toISOString()
+                        locator
                     });
-                    localStorage.setItem('locator-x-saved', JSON.stringify(saved));
-                    LocatorX.savedLocators.updateDropdown();
-                    LocatorX.notifications.success(`Locator saved as "${savedName}"`);
+                    await LocatorX.savedLocators.updateDropdown();
+                    LocatorX.notifications.success(`Locator saved as "${autoName}"`);
                 }
                 if (e.target.classList.contains('bi-trash')) {
                     const row = e.target.closest('tr');
                     if (row) {
-                        if (row.closest('.pom-table')) { LocatorX.pom.deleteLocator(row); }
+                        if (row.closest('.pom-table')) { await LocatorX.pom.deleteLocator(row); }
                         else {
                             row.remove();
                             this.updateRowNumbers();
@@ -3903,17 +3944,17 @@ const LocatorX = {
 
         setupEventListeners() {
             // Centralized Event Listener for Update Logic
-            document.addEventListener('locatorx-update', (e) => {
+            document.addEventListener('locatorx-update', async (e) => {
                 const { newValue, element, context } = e.detail;
                 const targetType = context.target;
 
                 if (targetType === 'saved-name') {
                     const index = parseInt(context.index);
-                    const saved = JSON.parse(localStorage.getItem('locator-x-saved') || '[]');
+                    const saved = await LocatorX.core.getSavedLocators();
                     if (saved[index]) {
-                        saved[index].name = newValue;
-                        localStorage.setItem('locator-x-saved', JSON.stringify(saved));
-                        LocatorX.savedLocators.updateDropdown();
+                        const item = saved[index];
+                        await LocatorX.core.saveLocator(newValue, item.type, item.locator);
+                        await LocatorX.savedLocators.updateDropdown();
                         LocatorX.notifications.success('Locator renamed');
                     }
                 } else if (targetType === 'table-cell') {

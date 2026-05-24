@@ -65,11 +65,16 @@ chrome.runtime.onStartup.addListener(() => {
 });
 
 // Tab switch listener
-chrome.tabs.onActivated.addListener((activeInfo) => {
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+    const states = await chrome.storage.session.get(['lx_tab_states']);
+    const tabStates = states.lx_tab_states || {};
+    const state = tabStates[activeInfo.tabId];
+
     chrome.runtime.sendMessage({
         action: 'activeTabChanged',
-        tabId: activeInfo.tabId
-    }).catch(() => {});
+        tabId: activeInfo.tabId,
+        state: state
+    }).catch(() => { });
 });
 
 // Tab navigation/reload listener
@@ -241,9 +246,38 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 }
             });
         }
-        sendResponse({ success: true });
+    } else if (message.action === 'saveTabState') {
+        chrome.storage.session.get(['lx_tab_states'], (result) => {
+            const states = result.lx_tab_states || {};
+            states[message.tabId] = {
+                ...(states[message.tabId] || {}),
+                ...message.state,
+                _lastUpdated: Date.now()
+            };
+            chrome.storage.session.set({ lx_tab_states: states }, () => {
+                sendResponse({ success: true });
+            });
+        });
+        return true;
+    } else if (message.action === 'getTabState') {
+        chrome.storage.session.get(['lx_tab_states'], (result) => {
+            const states = result.lx_tab_states || {};
+            sendResponse({ success: true, state: states[message.tabId] || null });
+        });
+        return true;
     }
     return false;
+});
+
+// Cleanup tab state on removal
+chrome.tabs.onRemoved.addListener((tabId) => {
+    chrome.storage.session.get(['lx_tab_states'], (result) => {
+        const states = result.lx_tab_states || {};
+        if (states[tabId]) {
+            delete states[tabId];
+            chrome.storage.session.set({ lx_tab_states: states });
+        }
+    });
 });
 
 // External Message Listener

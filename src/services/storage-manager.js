@@ -1,16 +1,101 @@
-// Core Storage Manager - Backend Logic
+// Core Storage Manager - Backend Logic (Asynchronous for Manifest V3)
 class StorageManager {
     constructor(storagePrefix = LocatorXConfig.STORAGE_KEYS.PREFIX) {
         this.prefix = storagePrefix;
+        this.migrationTag = 'lx_migrated_v3';
+    }
+
+    /**
+     * Migration utility: Moves data from localStorage to chrome.storage.local
+     * Runs on first call to any storage method if not already migrated.
+     */
+    async ensureMigrated() {
+        if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return;
+
+        const migrationCheck = await this._getRaw(this.migrationTag);
+        if (migrationCheck) return; // Already migrated
+
+        console.log('[Locator-X] Starting data migration from localStorage to chrome.storage.local...');
+
+        const keysToMigrate = [
+            LocatorXConfig.STORAGE_KEYS.SAVED,
+            LocatorXConfig.STORAGE_KEYS.POM_PAGES,
+            LocatorXConfig.STORAGE_KEYS.SETTINGS,
+            LocatorXConfig.STORAGE_KEYS.HISTORY,
+            LocatorXConfig.STORAGE_KEYS.THEME,
+            LocatorXConfig.STORAGE_KEYS.FILTERS('home'),
+            LocatorXConfig.STORAGE_KEYS.FILTERS('pom')
+        ];
+
+        const migrationData = {};
+        for (const key of keysToMigrate) {
+            const val = localStorage.getItem(key);
+            if (val) {
+                try {
+                    // Try to parse as JSON, if it fails, store as raw string (for theme)
+                    migrationData[key] = JSON.parse(val);
+                } catch (e) {
+                    migrationData[key] = val;
+                }
+            }
+        }
+
+        if (Object.keys(migrationData).length > 0) {
+            await chrome.storage.local.set(migrationData);
+            console.log(`[Locator-X] Migrated ${Object.keys(migrationData).length} keys.`);
+        }
+
+        await chrome.storage.local.set({ [this.migrationTag]: true });
+    }
+
+    // Helper for async storage access
+    async _getRaw(key) {
+        return new Promise((resolve) => {
+            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+                chrome.storage.local.get([key], (result) => {
+                    resolve(result[key]);
+                });
+            } else {
+                // Fallback to localStorage for non-extension environments (testing)
+                const val = localStorage.getItem(key);
+                try { resolve(JSON.parse(val)); } catch (e) { resolve(val); }
+            }
+        });
+    }
+
+    async _setRaw(key, value) {
+        return new Promise((resolve) => {
+            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+                chrome.storage.local.set({ [key]: value }, resolve);
+            } else {
+                const val = typeof value === 'string' ? value : JSON.stringify(value);
+                localStorage.setItem(key, val);
+                resolve();
+            }
+        });
+    }
+
+    async _removeRaw(key) {
+        return new Promise((resolve) => {
+            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+                chrome.storage.local.remove([key], resolve);
+            } else {
+                localStorage.removeItem(key);
+                resolve();
+            }
+        });
     }
 
     // Saved Locators Management
-    getSavedLocators() {
-        return JSON.parse(localStorage.getItem(LocatorXConfig.STORAGE_KEYS.SAVED) || '[]');
+    async getSavedLocators() {
+        await this.ensureMigrated();
+        const data = await this._getRaw(LocatorXConfig.STORAGE_KEYS.SAVED);
+        return Array.isArray(data) ? data : [];
     }
 
-    saveLocator(locator) {
-        const saved = this.getSavedLocators();
+    async saveLocator(locator) {
+        await this.ensureMigrated();
+        const saved = await this.getSavedLocators();
         const existing = saved.find(item => item.locator === locator.locator);
 
         if (existing) {
@@ -23,24 +108,28 @@ class StorageManager {
             });
         }
 
-        localStorage.setItem(LocatorXConfig.STORAGE_KEYS.SAVED, JSON.stringify(saved));
+        await this._setRaw(LocatorXConfig.STORAGE_KEYS.SAVED, saved);
         return existing ? 'updated' : 'created';
     }
 
-    deleteLocator(id) {
-        const saved = this.getSavedLocators();
+    async deleteLocator(id) {
+        await this.ensureMigrated();
+        const saved = await this.getSavedLocators();
         const filtered = saved.filter(item => item.id !== id);
-        localStorage.setItem(LocatorXConfig.STORAGE_KEYS.SAVED, JSON.stringify(filtered));
+        await this._setRaw(LocatorXConfig.STORAGE_KEYS.SAVED, filtered);
         return saved.length !== filtered.length;
     }
 
     // POM Pages Management
-    getPOMPages() {
-        return JSON.parse(localStorage.getItem(LocatorXConfig.STORAGE_KEYS.POM_PAGES) || '[]');
+    async getPOMPages() {
+        await this.ensureMigrated();
+        const data = await this._getRaw(LocatorXConfig.STORAGE_KEYS.POM_PAGES);
+        return Array.isArray(data) ? data : [];
     }
 
-    savePOMPage(page) {
-        const pages = this.getPOMPages();
+    async savePOMPage(page) {
+        await this.ensureMigrated();
+        const pages = await this.getPOMPages();
         const existingIndex = pages.findIndex(p => p.id === page.id);
 
         if (existingIndex !== -1) {
@@ -54,49 +143,59 @@ class StorageManager {
             });
         }
 
-        localStorage.setItem(LocatorXConfig.STORAGE_KEYS.POM_PAGES, JSON.stringify(pages));
+        await this._setRaw(LocatorXConfig.STORAGE_KEYS.POM_PAGES, pages);
         return existingIndex !== -1 ? 'updated' : 'created';
     }
 
-    deletePOMPage(pageId) {
-        const pages = this.getPOMPages();
+    async deletePOMPage(pageId) {
+        await this.ensureMigrated();
+        const pages = await this.getPOMPages();
         const filtered = pages.filter(p => p.id !== pageId);
-        localStorage.setItem(LocatorXConfig.STORAGE_KEYS.POM_PAGES, JSON.stringify(filtered));
+        await this._setRaw(LocatorXConfig.STORAGE_KEYS.POM_PAGES, filtered);
         return pages.length !== filtered.length;
     }
 
     // Settings Management
-    getSettings() {
-        return JSON.parse(localStorage.getItem(LocatorXConfig.STORAGE_KEYS.SETTINGS) || '{}');
+    async getSettings() {
+        await this.ensureMigrated();
+        const data = await this._getRaw(LocatorXConfig.STORAGE_KEYS.SETTINGS);
+        return (data && typeof data === 'object') ? data : {};
     }
 
-    saveSetting(key, value) {
-        const settings = this.getSettings();
+    async saveSetting(key, value) {
+        await this.ensureMigrated();
+        const settings = await this.getSettings();
         settings[key] = value;
-        localStorage.setItem(LocatorXConfig.STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+        await this._setRaw(LocatorXConfig.STORAGE_KEYS.SETTINGS, settings);
     }
 
-    getSetting(key, defaultValue = null) {
-        const settings = this.getSettings();
+    async getSetting(key, defaultValue = null) {
+        const settings = await this.getSettings();
         return settings[key] !== undefined ? settings[key] : defaultValue;
     }
 
     // Filter State Management
-    getFilterState(tab) {
-        return JSON.parse(localStorage.getItem(LocatorXConfig.STORAGE_KEYS.FILTERS(tab)) || '{}');
+    async getFilterState(tab) {
+        await this.ensureMigrated();
+        const data = await this._getRaw(LocatorXConfig.STORAGE_KEYS.FILTERS(tab));
+        return (data && typeof data === 'object') ? data : {};
     }
 
-    saveFilterState(tab, filters) {
-        localStorage.setItem(LocatorXConfig.STORAGE_KEYS.FILTERS(tab), JSON.stringify(filters));
+    async saveFilterState(tab, filters) {
+        await this.ensureMigrated();
+        await this._setRaw(LocatorXConfig.STORAGE_KEYS.FILTERS(tab), filters);
     }
 
     // History Management
-    getHistory() {
-        return JSON.parse(localStorage.getItem(LocatorXConfig.STORAGE_KEYS.HISTORY) || '[]');
+    async getHistory() {
+        await this.ensureMigrated();
+        const data = await this._getRaw(LocatorXConfig.STORAGE_KEYS.HISTORY);
+        return Array.isArray(data) ? data : [];
     }
 
-    addToHistory(item) {
-        const history = this.getHistory();
+    async addToHistory(item) {
+        await this.ensureMigrated();
+        const history = await this.getHistory();
         history.unshift({
             ...item,
             id: Date.now(),
@@ -104,7 +203,7 @@ class StorageManager {
         });
 
         // Limit history based on plan
-        let max = 50; // Default fallback
+        let max = 50;
         if (typeof planService !== 'undefined') {
             max = planService.getLimit('MAX_HISTORY_ITEMS') || 50;
         } else if (typeof LocatorXConfig !== 'undefined' && LocatorXConfig.LIMITS) {
@@ -115,20 +214,24 @@ class StorageManager {
             history.splice(max);
         }
 
-        localStorage.setItem(LocatorXConfig.STORAGE_KEYS.HISTORY, JSON.stringify(history));
+        await this._setRaw(LocatorXConfig.STORAGE_KEYS.HISTORY, history);
     }
 
-    clearHistory() {
-        localStorage.removeItem(LocatorXConfig.STORAGE_KEYS.HISTORY);
+    async clearHistory() {
+        await this.ensureMigrated();
+        await this._removeRaw(LocatorXConfig.STORAGE_KEYS.HISTORY);
     }
 
     // Theme Management
-    getTheme() {
-        return localStorage.getItem(LocatorXConfig.STORAGE_KEYS.THEME) || 'light';
+    async getTheme() {
+        await this.ensureMigrated();
+        const theme = await this._getRaw(LocatorXConfig.STORAGE_KEYS.THEME);
+        return theme || 'light';
     }
 
-    saveTheme(theme) {
-        localStorage.setItem(LocatorXConfig.STORAGE_KEYS.THEME, theme);
+    async saveTheme(theme) {
+        await this.ensureMigrated();
+        await this._setRaw(LocatorXConfig.STORAGE_KEYS.THEME, theme);
     }
 }
 

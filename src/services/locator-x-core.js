@@ -11,21 +11,21 @@ class LocatorXCore {
         if (this.initialized) return;
 
         // Load saved settings
-        this.settings = this.storage.getSettings();
-        this.theme = this.storage.getTheme();
+        this.settings = await this.storage.getSettings();
+        this.theme = await this.storage.getTheme();
 
         this.initialized = true;
     }
 
     // Locator Generation
     async generateLocators(element, options = {}) {
-        const enabledFilters = options.filters || this.getEnabledFilters();
+        const enabledFilters = await options.filters || await this.getEnabledFilters();
         const locators = this.generator.generateLocators(element, {
             strategies: enabledFilters
         });
 
         // Add to history
-        this.storage.addToHistory({
+        await this.storage.addToHistory({
             type: 'generation',
             element: this.getElementInfo(element),
             locators: locators,
@@ -36,104 +36,108 @@ class LocatorXCore {
     }
 
     // Filter Management
-    getEnabledFilters(tab = 'home') {
-        const filterState = this.storage.getFilterState(tab);
+    async getEnabledFilters(tab = 'home') {
+        const filterState = await this.storage.getFilterState(tab);
         return this.filterManager.getEnabledFilters(filterState);
     }
 
-    updateFilters(tab, filters) {
-        this.storage.saveFilterState(tab, filters);
+    async updateFilters(tab, filters) {
+        await this.storage.saveFilterState(tab, filters);
 
         // Validate with current framework
-        const framework = this.getSetting('framework', 'unknown');
+        const framework = await this.getSetting('framework', 'unknown');
 
         return this.filterManager.validateFilterCombination(
-            this.getEnabledFilters(tab),
+            await this.getEnabledFilters(tab),
             framework
         );
     }
 
-    applyDependencyRules(framework) {
+    async applyDependencyRules(framework) {
         const defaultFilters = this.filterManager.createDefaultFilterState();
 
         let homeFilters = this.filterManager.applyFrameworkRules(framework, defaultFilters);
 
         let pomFilters = { ...homeFilters };
 
-        this.storage.saveFilterState('home', homeFilters);
-        this.storage.saveFilterState('pom', pomFilters);
+        await this.storage.saveFilterState('home', homeFilters);
+        await this.storage.saveFilterState('pom', pomFilters);
 
         return { homeFilters, pomFilters };
     }
 
     // Settings Management
-    getSetting(key, defaultValue = null) {
-        return this.storage.getSetting(key, defaultValue);
+    async getSetting(key, defaultValue = null) {
+        return await this.storage.getSetting(key, defaultValue);
     }
 
-    saveSetting(key, value) {
-        this.storage.saveSetting(key, value);
+    async saveSetting(key, value) {
+        await this.storage.saveSetting(key, value);
 
         // Apply dependency rules if framework changed
         if (key === 'framework') {
-            const framework = this.getSetting('framework', 'unknown');
-            return this.applyDependencyRules(framework);
+            const framework = await this.getSetting('framework', 'unknown');
+            return await this.applyDependencyRules(framework);
         }
     }
 
     // Saved Locators Management
-    getSavedLocators() {
-        return this.storage.getSavedLocators();
+    async getSavedLocators() {
+        return await this.storage.getSavedLocators();
     }
 
-    saveLocator(name, type, locator) {
-        return this.storage.saveLocator({
-            name: name || this.generateAutoName(),
-            type,
-            locator
-        });
+    async saveLocator(data) {
+        // Support both old (name, type, locator) and new (obj) signatures
+        if (typeof data === 'string') {
+            return await this.storage.saveLocator({
+                name: data || this.generateAutoName(),
+                type: arguments[1],
+                locator: arguments[2]
+            });
+        }
+        return await this.storage.saveLocator(data);
     }
 
-    deleteLocator(id) {
-        return this.storage.deleteLocator(id);
+    async deleteLocator(id) {
+        return await this.storage.deleteLocator(id);
     }
 
     // POM Management
-    getPOMPages() {
-        return this.storage.getPOMPages();
+    async getPOMPages() {
+        return await this.storage.getPOMPages();
     }
 
-    savePOMPage(page) {
-        return this.storage.savePOMPage(page);
+    async savePOMPage(page) {
+        return await this.storage.savePOMPage(page);
     }
 
-    deletePOMPage(pageId) {
-        return this.storage.deletePOMPage(pageId);
+    async deletePOMPage(pageId) {
+        return await this.storage.deletePOMPage(pageId);
     }
 
     // Theme Management
-    getTheme() {
-        return this.storage.getTheme();
+    async getTheme() {
+        return await this.storage.getTheme();
     }
 
-    setTheme(theme) {
-        this.storage.saveTheme(theme);
+    async setTheme(theme) {
+        await this.storage.saveTheme(theme);
         this.theme = theme;
     }
 
-    toggleTheme() {
+    async toggleTheme() {
         const newTheme = this.theme === 'light' ? 'dark' : 'light';
-        this.setTheme(newTheme);
+        await this.setTheme(newTheme);
         return newTheme;
     }
 
     // History Management
-    getHistory() {
-        return this.storage.getHistory();
+    async getHistory() {
+        return await this.storage.getHistory();
     }
 
-    clearHistory() {
-        this.storage.clearHistory();
+    async clearHistory() {
+        await this.storage.clearHistory();
     }
 
     // Utility Methods
@@ -164,8 +168,8 @@ class LocatorXCore {
         }
     }
 
-    checkDuplicateSaved(locator, type) {
-        const saved = this.storage.getSavedLocators();
+    async checkDuplicateSaved(locator, type) {
+        const saved = await this.storage.getSavedLocators();
         return saved.some(item => item.locator === locator && item.type === type);
     }
 
@@ -181,24 +185,24 @@ class LocatorXCore {
     }
 
     // Export/Import
-    exportData() {
+    async exportData() {
         return {
-            saved: this.getSavedLocators(),
-            settings: this.storage.getSettings(),
-            history: this.getHistory(),
-            version: LocatorXConfig.VERSION
+            saved: await this.getSavedLocators(),
+            settings: await this.storage.getSettings(),
+            history: await this.getHistory(),
+            version: (typeof LocatorXConfig !== 'undefined') ? LocatorXConfig.VERSION : '1.0'
         };
     }
 
-    importData(data) {
+    async importData(data) {
         if (data.saved) {
-            localStorage.setItem(LocatorXConfig.STORAGE_KEYS.SAVED, JSON.stringify(data.saved));
+            await this.storage._setRaw(LocatorXConfig.STORAGE_KEYS.SAVED, data.saved);
         }
         if (data.settings) {
-            localStorage.setItem(LocatorXConfig.STORAGE_KEYS.SETTINGS, JSON.stringify(data.settings));
+            await this.storage._setRaw(LocatorXConfig.STORAGE_KEYS.SETTINGS, data.settings);
         }
         if (data.history) {
-            localStorage.setItem(LocatorXConfig.STORAGE_KEYS.HISTORY, JSON.stringify(data.history));
+            await this.storage._setRaw(LocatorXConfig.STORAGE_KEYS.HISTORY, data.history);
         }
     }
 }

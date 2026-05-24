@@ -7,7 +7,6 @@ class DOMScanner {
         this.lastRightClickedElement = null;
         this.matchedElements = []; // The elements currently matched
         this.axesState = { step: 0, anchor: null }; // Axes capture state
-        this.persistentInspect = false;
 
         // Init plan service for logic usage
         this.planService = typeof PlanService !== 'undefined' ? new PlanService() : null;
@@ -15,24 +14,32 @@ class DOMScanner {
 
         this.generator = new LocatorGenerator(this.planService);
         this.labelElement = null; // Private label element
+        this.settings = { excludeNumbers: true, maxMatchLimit: 150 };
+        
         this.setupEventListeners();
+        this.loadInitialConfig();
+    }
 
-        // Load config from storage logic
+    loadInitialConfig() {
         if (chrome.storage && chrome.storage.local) {
-            chrome.storage.local.get(['excludeNumbers', 'maxMatchLimit', 'persistentInspectEnabled'], (result) => {
-                const val = result.excludeNumbers !== undefined ? result.excludeNumbers : true;
-                if (this.generator) this.generator.setConfig({ excludeNumbers: val });
-
-                const maxLimit = result.maxMatchLimit !== undefined ? result.maxMatchLimit : 150;
-                const maxCap = (typeof LocatorXConfig !== 'undefined') ? LocatorXConfig.LIMITS.MAX_MATCH_DEFAULT : 500;
-                this.maxMatchLimit = Math.min(maxLimit, maxCap);
-
-                this.persistentInspect = result.persistentInspectEnabled !== undefined ? result.persistentInspectEnabled : false;
+            chrome.storage.local.get(['excludeNumbers', 'maxMatchLimit'], (result) => {
+                this.updateInternalConfig(result);
             });
         }
     }
 
-    // Universal highlight clearing function
+    updateInternalConfig(config) {
+        if (config.excludeNumbers !== undefined) {
+            this.settings.excludeNumbers = config.excludeNumbers;
+            if (this.generator) this.generator.setConfig({ excludeNumbers: config.excludeNumbers });
+        }
+        
+        if (config.maxMatchLimit !== undefined) {
+            const maxCap = (typeof LocatorXConfig !== 'undefined') ? LocatorXConfig.LIMITS.MAX_MATCH_DEFAULT : 500;
+            this.settings.maxMatchLimit = Math.min(config.maxMatchLimit, maxCap);
+        }
+    }
+
     // Universal highlight clearing function
     clearHighlights(scope = 'active') {
         const clearMatches = scope === 'matches' || scope === 'all';
@@ -90,11 +97,30 @@ class DOMScanner {
             } else if (message.action === 'evaluateSelector') {
                 try {
                     const maxCap = (typeof LocatorXConfig !== 'undefined') ? LocatorXConfig.LIMITS.MAX_MATCH_DEFAULT : 500;
-                    const limit = Math.min(message.maxMatchLimit || this.maxMatchLimit || 150, maxCap);
-                    const results = this.evaluateSelector(message.selector, message.type, message.enableSmartCorrect, limit);
-                    sendResponse(results);
+                    const limit = Math.min(message.maxMatchLimit || this.settings.maxMatchLimit || 150, maxCap);
+                    const result = this.evaluateSelector(message.selector, message.type, message.enableSmartCorrect, limit);
+                    sendResponse(result);
                 } catch (e) {
                     console.error('[DOMScanner] evaluateSelector error:', e);
+                    sendResponse({ error: e.toString() });
+                }
+            } else if (message.action === 'batchEvaluate') {
+                try {
+                    const maxCap = (typeof LocatorXConfig !== 'undefined') ? LocatorXConfig.LIMITS.MAX_MATCH_DEFAULT : 500;
+                    if (!this.generator) {
+                        this.generator = new LocatorGenerator();
+                    }
+                    const results = message.items.map(item => {
+                        try {
+                            const res = this.generator.validateLocator(item.selector, item.type, message.enableSmartCorrect, maxCap);
+                            return { id: item.id, count: res.count, suggestion: res.suggestion };
+                        } catch (e) {
+                            return { id: item.id, count: 0, error: true };
+                        }
+                    });
+                    sendResponse({ results });
+                } catch (e) {
+                    console.error('[DOMScanner] batchEvaluate error:', e);
                     sendResponse({ error: e.toString() });
                 }
             } else if (message.action === 'contextMenuLocator') {
@@ -107,13 +133,7 @@ class DOMScanner {
             } else if (message.action === 'swapAxes') {
                 this.swapAxes();
             } else if (message.action === 'updateConfig') {
-                if (this.generator) this.generator.setConfig(message.config);
-                if (message.config.maxMatchLimit !== undefined) {
-                    this.maxMatchLimit = message.config.maxMatchLimit;
-                }
-                if (message.config.persistentInspect !== undefined) {
-                    this.persistentInspect = message.config.persistentInspect;
-                }
+                this.updateInternalConfig(message.config);
             }
         });
 
@@ -143,13 +163,8 @@ class DOMScanner {
         // Stop scanning when tab becomes hidden (user switches browser tabs)
         document.addEventListener('visibilitychange', () => {
             if (document.hidden && this.isActive) {
-                if (!this.persistentInspect || this.currentMode === 'axes') {
-                    this.stopScanning(true);
-                    chrome.runtime.sendMessage({ action: 'deactivateInspect' }).catch(() => { });
-                } else {
-                    // Persistent mode: just clear active highlights to save CPU, but stay active
-                    this.clearHighlights('all');
-                }
+                // In tab-aware mode, we stay active but clear highlights to save CPU when tab is hidden
+                this.clearHighlights('all');
             }
         });
 
@@ -878,73 +893,6 @@ class DOMScanner {
         }
     }
 
-    getPageStructure() {
-        const commonTags = [
-            'div', 'span', 'a', 'button', 'input', 'form', 'img', 'label',
-            'select', 'option', 'textarea', 'ul', 'li', 'ol', 'table',
-            'tr', 'td', 'th', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p',
-            'nav', 'header', 'footer', 'section', 'article', 'aside', 'main'
-        ];
-
-        const structure = {
-            tags: {},
-            ids: {},
-            classes: {},
-            attributes: {
-                name: {},
-                role: {},
-                'data-testid': {},
-                placeholder: {}
-            },
-            textFragments: new Set()
-        };
-
-        // Scan all elements for a comprehensive map
-        const allElements = document.getElementsByTagName('*');
-        for (let i = 0; i < allElements.length; i++) {
-            const el = allElements[i];
-            const tag = el.tagName.toLowerCase();
-
-            // Tags
-            if (commonTags.includes(tag)) {
-                structure.tags[tag] = (structure.tags[tag] || 0) + 1;
-            }
-
-            // IDs
-            const ids = LocatorXConfig.IDENTIFIERS;
-            if (el.id && !el.id.toLowerCase().startsWith(ids.ID_PREFIX.toLowerCase())) {
-                structure.ids[el.id] = (structure.ids[el.id] || 0) + 1;
-            }
-
-            // Classes
-            if (el.classList.length > 0) {
-                el.classList.forEach(cls => {
-                    if (!cls.startsWith(ids.ID_PREFIX)) { // Using prefix for broad exclusion
-                        structure.classes[cls] = (structure.classes[cls] || 0) + 1;
-                    }
-                });
-            }
-
-            // Attributes
-            ['name', 'role', 'data-testid', 'placeholder'].forEach(attr => {
-                const val = el.getAttribute(attr);
-                if (val) {
-                    structure.attributes[attr][val] = (structure.attributes[attr][val] || 0) + 1;
-                }
-            });
-
-            // Text fragments (minimal threshold)
-            if (el.children.length === 0 && el.textContent.trim().length > 2 && el.textContent.trim().length < 50) {
-                const text = el.textContent.trim();
-                structure.textFragments.add(text);
-            }
-        }
-
-        // Convert Set to Array for JSON transmission
-        structure.textFragments = Array.from(structure.textFragments).slice(0, 50);
-
-        return structure;
-    }
 }
 
 // Initialize scanner
