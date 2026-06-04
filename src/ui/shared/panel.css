@@ -23,7 +23,7 @@
   max-width: 280px;
 }
 
-.warning-icon {
+.warning-content .warning-icon {
   font-size: 48px;
   color: #e74c3c;
   animation: pulse-red-icon 2s infinite ease-in-out;
@@ -701,7 +701,9 @@
 }
 
 .match-badge[data-count="0"],
-.match-count[data-count="0"] {
+.match-count[data-count="0"],
+.match-badge[data-count="ERR"],
+.match-count[data-count="ERR"] {
   background-color: var(--danger) !important;
 }
 
@@ -1749,10 +1751,6 @@ select:focus {
   border-color: rgba(255, 255, 255, 0.1);
 }
 
-.dark-theme .element-detail-text {
-  color: #a0aec0;
-}
-
 /* Adjust table container to fit with nav */
 .pom-container .table-container {
   height: calc(100% - 70px);
@@ -1809,20 +1807,6 @@ select:focus {
   width: 100%;
   overflow-x: hidden;
   text-overflow: ellipsis;
-}
-
-/* Nav Axes */
-.nav-option:hover .nav-axes {
-  color: var(--accent);
-}
-
-.nav-axes {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  color: var(--primary-text);
-  transition: color 0.2s ease;
 }
 
 /* Pulse Yellow Animation */
@@ -2227,4 +2211,25 @@ input:checked+.toggle-slider:before {
   height: 24px;
   min-width: unset;
   white-space: nowrap;
+}
+
+/* Healed locator indicator styles */
+.healed-locator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-style: italic;
+  color: var(--accent);
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px dashed rgba(255, 193, 7, 0.4);
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: help;
+  transition: all 0.2s ease;
+}
+
+.healed-locator:hover {
+  background: rgba(255, 193, 7, 0.2);
+  border-color: rgba(255, 193, 7, 0.6);
+  transform: translateY(-1px);
 }

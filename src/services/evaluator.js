@@ -124,6 +124,10 @@ class Evaluator {
                                 if (response.suggestedLocator && !primaryResponse) {
                                     primaryResponse = response;
                                 }
+                                // Capture error response
+                                if (response.error && (!primaryResponse || !primaryResponse.count)) {
+                                    primaryResponse = response;
+                                }
                             } else {
                                 frameResults[index] = { frameId: frame.frameId, count: 0 };
                             }
@@ -144,7 +148,15 @@ class Evaluator {
                                     }
                                 } else {
                                     this.currentGlobalIndex = -1;
-                                    this._updateBadge(settings.badge, 0);
+                                    if (primaryResponse && primaryResponse.error) {
+                                        this._updateBadge(settings.badge, 'ERR');
+                                        const badgeEl = typeof settings.badge === 'string' ? document.getElementById(settings.badge) : settings.badge;
+                                        if (badgeEl) badgeEl.title = primaryResponse.errorMessage || 'Invalid selector';
+                                    } else {
+                                        this._updateBadge(settings.badge, 0);
+                                        const badgeEl = typeof settings.badge === 'string' ? document.getElementById(settings.badge) : settings.badge;
+                                        if (badgeEl) badgeEl.removeAttribute('title');
+                                    }
                                 }
 
                                 if (settings.callback) settings.callback(this.totalMatches, primaryResponse || { count: this.totalMatches });

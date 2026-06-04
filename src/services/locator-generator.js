@@ -110,18 +110,28 @@ class LocatorGenerator {
         }
 
         let xpath = `${anchorXpath}/${axis}::${targetTag}${targetPredicate}`;
-        
-        // Uniqueness check
-        const matches = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-        if (matches.snapshotLength > 1) {
-            for (let i = 0; i < matches.snapshotLength; i++) {
-                if (matches.snapshotItem(i) === target) {
-                    xpath = `(${xpath})[${i + 1}]`;
-                    break;
+        return this.getUniqueXPath(xpath, target, false);
+    }
+
+    getUniqueXPath(xpath, target, useDeep = false) {
+        try {
+            const matches = useDeep 
+                ? this.evaluateXPathDeep(xpath)
+                : document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+            
+            const length = useDeep ? matches.length : matches.snapshotLength;
+            const getItem = (i) => useDeep ? matches[i] : matches.snapshotItem(i);
+
+            if (length > 1) {
+                for (let i = 0; i < length; i++) {
+                    if (getItem(i) === target) {
+                        return `(${xpath})[${i + 1}]`;
+                    }
                 }
             }
+        } catch (e) {
+            console.error('[Locator-X] Unique XPath indexing failed:', e);
         }
-
         return xpath;
     }
 
@@ -596,27 +606,7 @@ class LocatorGenerator {
         console.log('[Locator-X] generateIndexedXPath input:', element);
 
         const rel = this.generateRelativeXPath(element);
-
-        // If the generated relative XPath is already unique, no need for global index
-        if (this.isUnique(rel)) {
-            return rel;
-        }
-
-        // Otherwise, wrap in global index (standard Selenium/Playwright style)
-        let index = 1;
-        try {
-            const matches = this.evaluateXPathDeep(rel);
-            for (let i = 0; i < matches.length; i++) {
-                if (matches[i] === element) {
-                    index = i + 1;
-                    break;
-                }
-            }
-        } catch (e) {
-            console.error('[Locator-X] Indexed XPath calculation failed:', e);
-        }
-
-        const res = `(${rel})[${index}]`;
+        const res = this.getUniqueXPath(rel, element, true);
         console.log('[Locator-X] generateIndexedXPath result:', res);
         return res;
     }
@@ -683,25 +673,79 @@ class LocatorGenerator {
     generateStartsWithXPath(element) {
         console.log('[Locator-X] generateStartsWithXPath input:', element);
         const tag = element.tagName.toLowerCase();
+        const attrs = ['id', 'class', 'name', 'data-testid', 'aria-label'];
 
-        // 1. Try important attributes first
-        const attrs = ['id', 'name', 'title', 'placeholder', 'role', 'aria-label', 'data-testid', 'data-test', 'data-cy'];
+        // 1. Try dynamic prefix matching on attributes
         for (const attr of attrs) {
             const val = element.getAttribute(attr);
-            if (val && (!this.config.excludeNumbers || !/\d/.test(val))) {
-                const quote = val.includes("'") ? '"' : "'";
-                return `//${tag}[starts-with(@${attr}, ${quote}${val}${quote})]`;
+            if (!val) continue;
+
+            // Heuristic: Look for separator followed by numbers/random string
+            // e.g. "user-123", "btn_abc", "item:99"
+            const separators = ['-', '_', ':'];
+            for (const sep of separators) {
+                if (val.includes(sep)) {
+                    const parts = val.split(sep);
+                    // Check if last part is "dynamic looking" (digits)
+                    const lastPart = parts[parts.length - 1];
+                    const prefix = val.substring(0, val.lastIndexOf(sep) + 1);
+
+                    // If prefix is reasonably long and last part looks dynamic
+                    if (prefix.length > 2 && (/\d/.test(lastPart) || lastPart.length > 8)) {
+                        const quote = prefix.includes("'") ? '"' : "'";
+                        const xpath = `//${tag}[starts-with(@${attr}, ${quote}${prefix}${quote})]`;
+
+                        // Validate uniqueness
+                        if (this.isUnique(xpath)) {
+                            console.log('[Locator-X] generateStartsWithXPath result (dynamic separator):', xpath);
+                            return xpath;
+                        }
+                    }
+                }
+            }
+
+            // Fallback: If it starts with text but ends with numbers (e.g. user123)
+            if (/^[a-zA-Z]+.?\d+$/.test(val)) {
+                const prefix = val.replace(/\d+$/, '');
+                if (prefix.length > 3) {
+                    const quote = prefix.includes("'") ? '"' : "'";
+                    const xpath = `//${tag}[starts-with(@${attr}, ${quote}${prefix}${quote})]`;
+                    if (this.isUnique(xpath)) {
+                        console.log('[Locator-X] generateStartsWithXPath result (ends with numbers):', xpath);
+                        return xpath;
+                    }
+                }
             }
         }
 
-        // 2. Text Match
+        // 2. Fallback to basic important attributes starts-with (if unique)
+        const importantAttrs = ['id', 'name', 'title', 'placeholder', 'role', 'aria-label', 'data-testid', 'data-test', 'data-cy'];
+        for (const attr of importantAttrs) {
+            const val = element.getAttribute(attr);
+            if (val && (!this.config.excludeNumbers || !/\d/.test(val))) {
+                const quote = val.includes("'") ? '"' : "'";
+                const xpath = `//${tag}[starts-with(@${attr}, ${quote}${val}${quote})]`;
+                if (this.isUnique(xpath)) {
+                    console.log('[Locator-X] generateStartsWithXPath result (basic starts-with):', xpath);
+                    return xpath;
+                }
+            }
+        }
+
+        // 3. Fallback to Text Match starts-with (if unique)
         const text = element.textContent?.trim();
         if (text && text.length > 2 && text.length < 50) {
             const quote = text.includes("'") ? '"' : "'";
-            return `//${tag}[starts-with(text(), ${quote}${text}${quote})]`;
+            const xpath = `//${tag}[starts-with(text(), ${quote}${text}${quote})]`;
+            if (this.isUnique(xpath)) {
+                console.log('[Locator-X] generateStartsWithXPath result (text starts-with):', xpath);
+                return xpath;
+            }
         }
 
-        return `//${tag}`;
+        // Default tag-only fallback if it's unique, otherwise null
+        const defaultXpath = `//${tag}`;
+        return this.isUnique(defaultXpath) ? defaultXpath : null;
     }
 
     generateCSSXPath(element) {
@@ -726,53 +770,6 @@ class LocatorGenerator {
         }
 
         return `//${tag}`;
-    }
-
-    generateStartsWithXPath(element) {
-        console.log('[Locator-X] generateStartsWithXPath input:', element);
-        const attrs = ['id', 'class', 'name', 'data-testid', 'aria-label'];
-
-        for (const attr of attrs) {
-            const val = element.getAttribute(attr);
-            if (!val) continue;
-
-            // Heuristic: Look for separator followed by numbers/random string
-            // e.g. "user-123", "btn_abc", "item:99"
-            const separators = ['-', '_', ':'];
-            for (const sep of separators) {
-                if (val.includes(sep)) {
-                    const parts = val.split(sep);
-                    // Check if last part is "dynamic looking" (digits)
-                    const lastPart = parts[parts.length - 1];
-                    const prefix = val.substring(0, val.lastIndexOf(sep) + 1);
-
-                    // If prefix is reasonably long and last part looks dynamic
-                    if (prefix.length > 2 && (/\d/.test(lastPart) || lastPart.length > 8)) {
-                        const quote = prefix.includes("'") ? '"' : "'";
-                        const tag = element.tagName.toLowerCase();
-                        const xpath = `//${tag}[starts-with(@${attr}, ${quote}${prefix}${quote})]`;
-
-                        // Validate uniqueness
-                        if (this.isUnique(xpath)) {
-                            console.log('[Locator-X] generateStartsWithXPath result:', xpath);
-                            return xpath;
-                        }
-                    }
-                }
-            }
-
-            // Fallback: If it starts with text but ends with numbers
-            if (/^[a-zA-Z]+.?\d+$/.test(val)) {
-                const prefix = val.replace(/\d+$/, '');
-                if (prefix.length > 3) {
-                    const quote = prefix.includes("'") ? '"' : "'";
-                    const tag = element.tagName.toLowerCase();
-                    const xpath = `//${tag}[starts-with(@${attr}, ${quote}${prefix}${quote})]`;
-                    if (this.isUnique(xpath)) return xpath;
-                }
-            }
-        }
-        return null;
     }
 
     generateOrXPath(element) {
@@ -847,7 +844,12 @@ class LocatorGenerator {
                 if (lowerStrategy.includes('xpath') || lowerStrategy === 'absolutexpath') {
                     try {
                         return this.evaluateXPathDeep(selector, document, [], limit).length;
-                    } catch (e) { return 0; }
+                    } catch (e) {
+                        if (e.name === 'SyntaxError' || e instanceof DOMException) {
+                            throw e;
+                        }
+                        return 0;
+                    }
                 }
                 if (lowerStrategy === 'linktext') {
                     const links = this.querySelectorAllDeep('a', document, [], limit);
@@ -933,7 +935,11 @@ class LocatorGenerator {
             if (cssMatches.length === 0 || cssError || looksLikeXpath) {
                 try {
                     xpathMatches = this.evaluateXPathDeep(selector, document, [], smartLimit);
-                } catch (e) { }
+                } catch (e) {
+                    if (e.name === 'SyntaxError' || e instanceof DOMException) {
+                        throw e;
+                    }
+                }
             }
 
             // Text search fallback (DevTools style)
@@ -944,6 +950,9 @@ class LocatorGenerator {
 
             return Math.max(cssMatches.length, xpathMatches.length, textCount);
         } catch (e) {
+            if (e.name === 'SyntaxError' || e instanceof DOMException || e.message.includes('SyntaxError') || e.message.includes('not a valid selector')) {
+                throw e;
+            }
             return 0;
         }
     }
@@ -981,7 +990,11 @@ class LocatorGenerator {
                     results.push(item);
                 }
             }
-        } catch (e) { }
+        } catch (e) {
+            if (e.name === 'SyntaxError' || e instanceof DOMException) {
+                throw e;
+            }
+        }
 
         if (results.length >= limit) return results;
 
@@ -1269,6 +1282,120 @@ class LocatorGenerator {
                         }
                     }
                 }
+            }
+        }
+
+        // If suggestion is still null, try Advanced Structural Healing
+        if (suggestion === null && (lowerStrategy === 'css' || lowerStrategy.includes('xpath'))) {
+            try {
+                const isXpath = lowerStrategy.includes('xpath');
+                
+                // 1. Parse target text, tag, and key attributes from the selector
+                let targetTag = '*';
+                let targetText = '';
+                let targetAttrs = {};
+
+                if (isXpath) {
+                    // Extract tag name (e.g. //button or //div)
+                    const tagMatch = selector.match(/\/\/([a-zA-Z0-9_-]+)/);
+                    if (tagMatch) targetTag = tagMatch[1];
+
+                    // Extract text contents if any (e.g., text()='Login' or contains(text(),'Login'))
+                    const textMatch = selector.match(/text\(\)\s*=\s*['"](.*?)['"]/i) || selector.match(/contains\(text\(\)\s*,\s*['"](.*?)['"]\)/i);
+                    if (textMatch) targetText = textMatch[1].trim();
+
+                    // Extract other attributes (e.g. [@id='foo'] or [@name='bar'])
+                    const attrMatches = selector.matchAll(/@([a-zA-Z0-9_-]+)\s*=\s*['"](.*?)['"]/g);
+                    for (const am of attrMatches) {
+                        targetAttrs[am[1]] = am[2];
+                    }
+                } else {
+                    // CSS parsing
+                    // Extract tag (e.g. button#foo or div.container)
+                    const tagMatch = selector.match(/^([a-zA-Z0-9_-]+)/);
+                    if (tagMatch) targetTag = tagMatch[1];
+
+                    // Extract ID (e.g., #foo)
+                    const idMatch = selector.match(/#([a-zA-Z0-9_-]+)/);
+                    if (idMatch) targetAttrs['id'] = idMatch[1];
+
+                    // Extract class (e.g., .container)
+                    const classMatch = selector.match(/\.([a-zA-Z0-9_-]+)/);
+                    if (classMatch) targetAttrs['class'] = classMatch[1];
+
+                    // Extract other attributes (e.g. [name='bar'])
+                    const attrMatches = selector.matchAll(/\[([a-zA-Z0-9_-]+)\s*=\s*['"](.*?)['"]/g);
+                    for (const am of attrMatches) {
+                        targetAttrs[am[1]] = am[2];
+                    }
+                }
+
+                // 2. Scan all elements in the DOM matching the target tag
+                const candidates = this.querySelectorAllDeep(targetTag);
+                let bestCandidate = null;
+                let bestScore = 0;
+
+                for (let i = 0; i < candidates.length; i++) {
+                    const el = candidates[i];
+                    let score = 0;
+
+                    // Match tag name
+                    if (targetTag !== '*' && el.tagName.toLowerCase() === targetTag.toLowerCase()) {
+                        score += 10;
+                    }
+
+                    // Match text content
+                    const elText = el.textContent?.trim() || '';
+                    if (targetText && elText) {
+                        if (elText === targetText) {
+                            score += 50; // Perfect match
+                        } else if (elText.includes(targetText) || targetText.includes(elText)) {
+                            score += 30; // Partial match
+                        } else {
+                            const dist = this.levenshtein(clean(elText), clean(targetText));
+                            const threshold = Math.max(1, Math.min(4, Math.floor(targetText.length / 4)));
+                            if (dist <= threshold) score += 40; // Fuzzy spelling match
+                        }
+                    }
+
+                    // Match attributes
+                    Object.entries(targetAttrs).forEach(([attrName, attrVal]) => {
+                        const elVal = el.getAttribute(attrName);
+                        if (elVal) {
+                            if (elVal === attrVal) {
+                                score += 40;
+                            } else {
+                                const dist = this.levenshtein(clean(elVal), clean(attrVal));
+                                if (dist <= Math.max(1, Math.floor(attrVal.length / 4))) {
+                                    score += 25;
+                                }
+                            }
+                        }
+                    });
+
+                    // Threshold to prevent matching completely unrelated elements
+                    if (score >= 40 && score > bestScore) {
+                        bestScore = score;
+                        bestCandidate = el;
+                    }
+                }
+
+                // 3. Generate a fresh locator for the best candidate element
+                if (bestCandidate) {
+                    let freshLocator = null;
+                    if (isXpath) {
+                        freshLocator = this.generateRelativeXPath(bestCandidate);
+                    } else {
+                        freshLocator = this.generateCSSSelector(bestCandidate);
+                    }
+
+                    if (freshLocator) {
+                        suggestion = freshLocator;
+                        count = 1; // Mark that it matches exactly 1 element
+                    }
+                }
+            } catch (err) {
+                console.warn('[Locator-X] Advanced structural healing error:', err);
             }
         }
 

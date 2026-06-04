@@ -115,7 +115,7 @@ class DOMScanner {
                             const res = this.generator.validateLocator(item.selector, item.type, message.enableSmartCorrect, maxCap);
                             return { id: item.id, count: res.count, suggestion: res.suggestion };
                         } catch (e) {
-                            return { id: item.id, count: 0, error: true };
+                            return { id: item.id, count: 0, error: true, errorMessage: e.message || e.toString() };
                         }
                     });
                     sendResponse({ results });
@@ -441,8 +441,6 @@ class DOMScanner {
 
         element.setAttribute('lx-high', highlightValue);
 
-        element.setAttribute('lx-high', highlightValue);
-
         // Update Label
         this.updateLabel(element);
     }
@@ -610,9 +608,11 @@ class DOMScanner {
             }
             return status;
         } catch (e) {
-            if (e.name === 'SyntaxError' || e instanceof DOMException) { return { count: 0, status: 'none' }; }
+            if (e.name === 'SyntaxError' || e instanceof DOMException) {
+                return { count: 0, status: 'error', error: true, errorMessage: e.message || e.toString() };
+            }
             console.warn(`Error evaluating selector "${selector}":`, e);
-            return { count: 0, status: 'none' };
+            return { count: 0, status: 'none', error: true, errorMessage: e.message || e.toString() };
         }
     }
 
@@ -820,37 +820,10 @@ class DOMScanner {
 
     isDynamicElement(element) {
         if (!element) return false;
-
-        const id = element.id;
-        const className = element.className;
-
-        // Check ID for dynamic patterns
-        if (id) {
-            // Common dynamic patterns:
-            // 1. Long random strings (e.g. "a1b2c3d4")
-            // 2. Timestamps or sequences (e.g. "input-123456789")
-            // 3. Framework specific (e.g. "j_id_1")
-            if (/\d{4,}/.test(id) || // Contains 4+ digits
-                /[a-f0-9]{8,}/.test(id) || // Long hex string
-                /^ember\d+/.test(id) ||
-                /^j_id/.test(id) ||
-                /^[:.-]/.test(id)) {
-                return true;
-            }
+        if (!this.generator) {
+            this.generator = new LocatorGenerator();
         }
-
-        // Check Class for dynamic patterns
-        if (className && typeof className === 'string') {
-            const classes = className.split(/\s+/);
-            for (const cls of classes) {
-                if (/\d{4,}/.test(cls) || // Contains 4+ digits
-                    /^[a-z]{1,2}-[a-z0-9]{6,}/i.test(cls)) { // weird framework classes like css-1x2y3z
-                    return true;
-                }
-            }
-        }
-
-        return false;
+        return this.generator.isDynamicElement(element);
     }
 
     handleContextMenuLocator(menuId) {

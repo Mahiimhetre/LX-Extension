@@ -1104,7 +1104,11 @@ const LocatorX = {
 
             }).catch(err => {
                 console.error(err);
-                LocatorX.notifications.error('Scan Failed: ' + err.message);
+                if (err.name === 'SyntaxError' || err.message.includes('Regex') || err.message.includes('pattern') || err.message.includes('regular expression')) {
+                    LocatorX.notifications.error('Invalid Custom Pattern: ' + err.message);
+                } else {
+                    LocatorX.notifications.error('Scan Failed: ' + err.message);
+                }
                 this.resetScanBtn(scanBtn, originalText);
             });
         },
@@ -1265,18 +1269,36 @@ const LocatorX = {
             items.forEach(async (item) => {
                 let totalCount = 0;
                 let autoSuggestion = null;
+                let isError = false;
+                let errorMessage = '';
 
                 allFrameResults.forEach(frameResults => {
                     if (frameResults.results) {
                         const res = frameResults.results.find(r => r.id === item.id);
                         if (res) {
-                            totalCount += res.count || 0;
-                            if (res.suggestion && !autoSuggestion) autoSuggestion = res.suggestion;
+                            if (res.error) {
+                                isError = true;
+                                errorMessage = res.errorMessage || 'Invalid locator syntax';
+                            } else {
+                                totalCount += res.count || 0;
+                                if (res.suggestion && !autoSuggestion) autoSuggestion = res.suggestion;
+                            }
                         }
                     }
                 });
 
-                LocatorX.utils._updateBadge(item.id, totalCount);
+                const badge = document.getElementById(item.id);
+                if (isError) {
+                    LocatorX.utils._updateBadge(item.id, 'ERR');
+                    if (badge) {
+                        badge.title = errorMessage;
+                    }
+                } else {
+                    LocatorX.utils._updateBadge(item.id, totalCount);
+                    if (badge) {
+                        badge.removeAttribute('title');
+                    }
+                }
 
                 if (autoSuggestion && autoSuggestion !== item.selector) {
                     const config = await LocatorX.utils.getConfig(['smartCorrectEnabled'], { smartCorrectEnabled: true });
@@ -1301,7 +1323,10 @@ const LocatorX = {
                 // MultiScan: Locator is in 4th column (index 3)
                 // Main Table: handled differently, but validateMatch is mostly MultiScan context
                 if (row.cells[3]) {
-                    row.cells[3].textContent = suggestion;
+                    const originalLocator = row.cells[3].textContent.trim();
+                    const cleanOriginal = originalLocator.startsWith('✨') ? originalLocator.substring(2).trim() : originalLocator;
+
+                    row.cells[3].innerHTML = `<span class="healed-locator" title="Auto-healed by Locator-X (Original: ${LocatorX.utils.escapeHtml(cleanOriginal)})">✨ ${LocatorX.utils.escapeHtml(suggestion)}</span>`;
 
                     // Visual Feedback
                     row.cells[3].style.transition = 'background-color 0.5s';
@@ -1517,7 +1542,6 @@ const LocatorX = {
         pomFilters: {},
         lastLocators: null,
         lastLocatorTime: 0,
-        lastElementInfo: null,
         lastElementInfo: null,
         lastElementType: null,
         lastMetadata: null,
