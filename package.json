@@ -4,7 +4,8 @@
   "description": "A powerful browser extension for generating and managing web element locators for test automation.",
   "main": "index.js",
   "scripts": {
-    "test": "node src/tests/plan-service.test.js && node src/tests/filter-manager.test.js && node src/tests/multi-scan-manager.test.js && node src/tests/locator-generator.test.js && node src/tests/verify_migration.js"
+    "test": "node src/tests/plan-service.test.js && node src/tests/filter-manager.test.js && node src/tests/multi-scan-manager.test.js && node src/tests/locator-generator.test.js && node src/tests/verify_migration.js",
+    "build": "node scripts/build.js"
   },
   "keywords": [],
   "author": "",

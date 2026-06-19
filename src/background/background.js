@@ -288,9 +288,16 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
     return false;
 });
 
-// Icon click -> Open Sidepanel
+// Icon click -> Open Sidepanel/Sidebar
 chrome.action.onClicked.addListener((tab) => {
-    chrome.sidePanel.open({ tabId: tab.id });
+    if (typeof chrome.sidePanel !== 'undefined' && typeof chrome.sidePanel.open === 'function') {
+        chrome.sidePanel.open({ tabId: tab.id }).catch(() => {});
+    } else {
+        const browserInstance = typeof browser !== 'undefined' ? browser : chrome;
+        if (browserInstance.sidebarAction && typeof browserInstance.sidebarAction.open === 'function') {
+            browserInstance.sidebarAction.open();
+        }
+    }
 });
 
 // Handle sidepanel cleanup on close
