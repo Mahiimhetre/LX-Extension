@@ -19,9 +19,13 @@ const LocatorX = {
 
             const notification = document.createElement('div');
             notification.className = `notification ${type}`;
+
+            const hasHtml = /<[a-z][\s\S]*>/i.test(message);
+            const displayMessage = hasHtml ? message : LocatorX.utils.escapeHtml(message);
+
             notification.innerHTML = `
                 <i class="bi ${this._getIcon(type)}"></i>
-                <span class="message">${LocatorX.utils.escapeHtml(message)}</span>
+                <span class="message">${displayMessage}</span>
             `;
 
             container.appendChild(notification);
@@ -141,19 +145,13 @@ const LocatorX = {
 
             const service = LocatorX.debuggerService;
 
-            // CASE 1: RESET UI (Resume handled by browser)
-            if (btn && btn.classList.contains('active') && btn.classList.contains('bi-play-fill')) {
-                service.reset();
-                return;
-            }
-
-            // CASE 2: CANCEL
+            // CASE 1: CANCEL
             if (service.timer) {
                 service.cancel();
                 return;
             }
 
-            // CASE 3: START
+            // CASE 2: START
             try {
                 await service.startCountdown();
             } catch (err) {
@@ -344,11 +342,13 @@ const LocatorX = {
             const addBtn = document.getElementById('addPageBtn');
             const editBtn = document.getElementById('editPageBtn');
             const deleteBtn = document.getElementById('deletePageBtn');
+            const exportBtn = document.getElementById('exportPageBtn');
 
             if (select) { select.addEventListener('change', (e) => this.switchPage(e.target.value)); }
             if (addBtn) addBtn.addEventListener('click', () => this.createPage());
             if (editBtn) editBtn.addEventListener('click', () => this.renamePage());
             if (deleteBtn) deleteBtn.addEventListener('click', () => this.deletePage());
+            if (exportBtn) exportBtn.addEventListener('click', () => this.exportPageCode());
             // Enable Ctrl+Scroll for horizontal scrolling
             const pomTableContainer = document.querySelector('.pom-container .table-container');
             if (pomTableContainer) {
@@ -360,6 +360,264 @@ const LocatorX = {
                 });
             }
         },
+
+        async exportPageCode() {
+            const page = await this.getCurrentPage();
+            if (!page || !page.locators || page.locators.length === 0) {
+                LocatorX.notifications.warn('No page or elements available to export.');
+                return;
+            }
+
+            // Framework list modal html select
+            const html = `
+                <div style="margin-bottom:12px;">
+                    <label style="display:block;margin-bottom:6px;font-size:11px;font-weight:600;color:var(--text-secondary);">Select Target Framework</label>
+                    <select class="modal-select settings-select" style="width:100%;height:28px;box-sizing:border-box;">
+                        <option value="playwright">Playwright (JS/TS)</option>
+                        <option value="selenium-java">Selenium Java (PageFactory)</option>
+                        <option value="selenium-python">Selenium Python</option>
+                        <option value="cypress">Cypress (JS/TS)</option>
+                    </select>
+                </div>
+            `;
+
+            const framework = await LocatorX.modal.show({
+                type: 'confirm',
+                title: 'Export Page Object Code',
+                message: html,
+                confirmText: 'Export'
+            });
+
+            if (!framework) return;
+
+            // Generate elements code data
+            const rows = document.querySelectorAll('.pom-table tbody tr');
+            const elementsData = page.locators.map((item, index) => {
+                const elementLocators = Array.isArray(item) ? item : item.locators;
+                let preferredType = '';
+                let locatorValue = '';
+
+                const row = rows[index];
+                if (row) {
+                    const strategySelect = row.querySelector('.strategy-select');
+                    if (strategySelect) {
+                        preferredType = strategySelect.value;
+                        const selectedOpt = strategySelect.options[strategySelect.selectedIndex];
+                        locatorValue = selectedOpt ? selectedOpt.getAttribute('data-locator') : '';
+                    }
+                }
+
+                if (!locatorValue || locatorValue === '-') {
+                    const best = this.getBestLocator(elementLocators);
+                    preferredType = best.type;
+                    locatorValue = best.value;
+                }
+
+                const varName = this.generateVariableName(elementLocators, index);
+
+                return {
+                    varName,
+                    locatorTypeOfPreference: preferredType,
+                    locatorValue
+                };
+            });
+
+            let exportedCode = '';
+            let fileExtension = 'js';
+            const pascalName = this.toPascalCase(page.name);
+
+            const escapeString = (str) => {
+                if (!str) return '';
+                return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+            };
+
+            if (framework === 'playwright') {
+                fileExtension = 'ts';
+                exportedCode = `import { Page, Locator } from '@playwright/test';\n\n`;
+                exportedCode += `export class ${pascalName} {\n`;
+                exportedCode += `    readonly page: Page;\n`;
+                elementsData.forEach(el => {
+                    exportedCode += `    readonly ${el.varName}: Locator;\n`;
+                });
+                exportedCode += `\n    constructor(page: Page) {\n`;
+                exportedCode += `        this.page = page;\n`;
+                elementsData.forEach(el => {
+                    exportedCode += `        this.${el.varName} = page.locator('${escapeString(el.locatorValue)}');\n`;
+                });
+                exportedCode += `    }\n`;
+                exportedCode += `}\n`;
+            } else if (framework === 'selenium-java') {
+                fileExtension = 'java';
+                exportedCode = `import org.openqa.selenium.WebDriver;\n`;
+                exportedCode += `import org.openqa.selenium.WebElement;\n`;
+                exportedCode += `import org.openqa.selenium.support.FindBy;\n`;
+                exportedCode += `import org.openqa.selenium.support.PageFactory;\n\n`;
+                exportedCode += `public class ${pascalName} {\n`;
+                exportedCode += `    private WebDriver driver;\n\n`;
+                elementsData.forEach(el => {
+                    let type = el.locatorTypeOfPreference.toLowerCase();
+                    let val = el.locatorValue;
+                    if (type === 'id') {
+                        exportedCode += `    @FindBy(id = "${escapeString(val.replace('#', ''))}")\n`;
+                    } else if (type === 'name') {
+                        const nameVal = val.match(/name=['"]?([^'"\]]+)['"]?/)?.[1] || val;
+                        exportedCode += `    @FindBy(name = "${escapeString(nameVal)}")\n`;
+                    } else if (type === 'css') {
+                        exportedCode += `    @FindBy(css = "${escapeString(val)}")\n`;
+                    } else {
+                        exportedCode += `    @FindBy(xpath = "${escapeString(val)}")\n`;
+                    }
+                    exportedCode += `    private WebElement ${el.varName};\n\n`;
+                });
+                exportedCode += `    public ${pascalName}(WebDriver driver) {\n`;
+                exportedCode += `        this.driver = driver;\n`;
+                exportedCode += `        PageFactory.initElements(driver, this);\n`;
+                exportedCode += `    }\n`;
+                exportedCode += `}\n`;
+            } else if (framework === 'selenium-python') {
+                fileExtension = 'py';
+                exportedCode = `from selenium.webdriver.common.by import By\n\n`;
+                exportedCode += `class ${pascalName}:\n`;
+                exportedCode += `    def __init__(self, driver):\n`;
+                exportedCode += `        self.driver = driver\n`;
+                elementsData.forEach(el => {
+                    let type = el.locatorTypeOfPreference.toLowerCase();
+                    let val = el.locatorValue;
+                    let byType = 'XPATH';
+                    let byVal = val;
+                    if (type === 'id') {
+                        byType = 'ID';
+                        byVal = val.replace('#', '');
+                    } else if (type === 'name') {
+                        byType = 'NAME';
+                        byVal = val.match(/name=['"]?([^'"\]]+)['"]?/)?.[1] || val;
+                    } else if (type === 'css') {
+                        byType = 'CSS_SELECTOR';
+                    }
+                    exportedCode += `        self.${el.varName} = lambda: self.driver.find_element(By.${byType}, "${escapeString(byVal)}")\n`;
+                });
+            } else if (framework === 'cypress') {
+                fileExtension = 'js';
+                exportedCode = `class ${pascalName} {\n`;
+                elementsData.forEach(el => {
+                    exportedCode += `    get ${el.varName}() {\n`;
+                    exportedCode += `        return cy.get('${escapeString(el.locatorValue)}');\n`;
+                    exportedCode += `    }\n\n`;
+                });
+                exportedCode += `}\n\n`;
+                exportedCode += `export default new ${pascalName}();\n`;
+            }
+
+            this.downloadFile(`${pascalName}.${fileExtension}`, exportedCode);
+            LocatorX.notifications.success(`POM code exported for ${pascalName}`);
+        },
+
+        downloadFile(filename, text) {
+            const element = document.createElement('a');
+            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+            element.setAttribute('download', filename);
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+        },
+
+        getBestLocator(elementItem) {
+            const locators = Array.isArray(elementItem) ? elementItem : elementItem.locators;
+            if (!locators || locators.length === 0) return { type: 'css', value: 'unknown' };
+
+            const preferences = [
+                { type: 'ID', name: 'id' },
+                { type: 'Name', name: 'name' },
+                { type: 'CSS', name: 'css' },
+                { type: 'Relative XPath', name: 'xpath' },
+                { type: 'OR XPath', name: 'xpath' },
+                { type: 'Contains XPath', name: 'xpath' },
+                { type: 'Link Text', name: 'linkText' },
+                { type: 'TagName', name: 'tagName' },
+                { type: 'Absolute XPath', name: 'xpath' }
+            ];
+
+            for (const pref of preferences) {
+                const found = locators.find(l => l.type === pref.type);
+                if (found && found.locator) {
+                    return {
+                        type: pref.name,
+                        value: found.locator
+                    };
+                }
+            }
+
+            return {
+                type: 'css',
+                value: locators[0].locator
+            };
+        },
+
+        generateVariableName(elementItem, index) {
+            const locators = Array.isArray(elementItem) ? elementItem : elementItem.locators;
+            if (!locators || locators.length === 0) return `element_${index + 1}`;
+
+            const toCamelCase = (str) => {
+                return str
+                    .toLowerCase()
+                    .replace(/[^a-zA-Z0-9]+(.)/g, (m, chr) => chr.toUpperCase())
+                    .replace(/[^a-zA-Z0-9]/g, '');
+            };
+
+            const idLoc = locators.find(l => l.type === 'ID');
+            if (idLoc && idLoc.locator) {
+                const raw = idLoc.locator.replace('#', '');
+                return toCamelCase(raw);
+            }
+
+            const nameLoc = locators.find(l => l.type === 'Name');
+            if (nameLoc && nameLoc.locator) {
+                const match = nameLoc.locator.match(/name=['"]?([^'"\]]+)['"]?/);
+                if (match && match[1]) {
+                    return toCamelCase(match[1]);
+                }
+            }
+
+            const linkLoc = locators.find(l => l.type === 'Link Text' || l.type === 'Partial Link Text');
+            if (linkLoc && linkLoc.locator) {
+                return toCamelCase(linkLoc.locator.replace(/[^a-zA-Z0-9 ]/g, '')) + 'Link';
+            }
+
+            const xpathLoc = locators.find(l => l.type === 'Relative XPath' || l.type === 'OR XPath');
+            if (xpathLoc && xpathLoc.locator) {
+                const textMatch = xpathLoc.locator.match(/text\(\)=['"]?([^'")]+)['"]?/) || 
+                                  xpathLoc.locator.match(/normalize-space\(\)=['"]?([^'")]+)['"]?/);
+                if (textMatch && textMatch[1]) {
+                    const cleanText = textMatch[1].replace(/[^a-zA-Z0-9 ]/g, '');
+                    if (cleanText.trim().length > 0) {
+                        const tag = xpathLoc.locator.match(/^\/\/([a-zA-Z0-9]+)/);
+                        const suffix = tag && tag[1] ? toCamelCase(tag[1]) : 'Element';
+                        return toCamelCase(cleanText) + suffix.charAt(0).toUpperCase() + suffix.slice(1);
+                    }
+                }
+            }
+
+            const classLoc = locators.find(l => l.type === 'ClassName');
+            if (classLoc && classLoc.locator) {
+                const raw = classLoc.locator.replace(/^\./, '').split('.')[0];
+                return toCamelCase(raw);
+            }
+
+            const tagLoc = locators.find(l => l.type === 'TagName');
+            const tag = tagLoc && tagLoc.locator ? tagLoc.locator : 'element';
+            return `${tag}_${index + 1}`;
+        },
+
+        toPascalCase(str) {
+            if (!str) return 'Page';
+            const clean = str.replace(/[^a-zA-Z0-9 ]/g, '');
+            return clean
+                .split(' ')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join('');
+        },
+
         async loadPages() {
             const pages = await LocatorX.core.getPOMPages();
             const select = document.getElementById('pomPageSelect');
@@ -470,7 +728,7 @@ const LocatorX = {
         async addLocatorToPage(locator) {
             const page = await this.getCurrentPage();
             if (!page) {
-                LocatorX.notifications.warning('Please select or create a page first.');
+                LocatorX.notifications.warn('Please select or create a page first.');
                 return;
             }
 
@@ -642,6 +900,30 @@ const LocatorX = {
                     }
                 });
             }
+        },
+
+        async updateLocator(row, type, newValue) {
+            const tbody = row.parentElement;
+            const index = Array.from(tbody.children).indexOf(row);
+
+            if (index === -1) return;
+
+            const page = await this.getCurrentPage();
+            if (page && page.locators) {
+                const item = page.locators[index];
+                const elementLocators = Array.isArray(item) ? item : item.locators;
+
+                if (elementLocators) {
+                    const loc = elementLocators.find(l => l.type === type);
+                    if (loc) {
+                        loc.locator = newValue;
+                    } else {
+                        elementLocators.push({ type, locator: newValue, matches: 0 });
+                    }
+                    await LocatorX.core.savePOMPage(page);
+                    LocatorX.notifications.success('POM locator updated');
+                }
+            }
         }
     },
 
@@ -770,6 +1052,33 @@ const LocatorX = {
             const swapBtn = document.getElementById('axesSwapBtn');
             if (swapBtn) {
                 swapBtn.addEventListener('click', () => this.swap());
+            }
+
+            const anchorBox = document.getElementById('axesAnchorBox');
+            if (anchorBox) {
+                anchorBox.addEventListener('click', () => {
+                    // Activate inspect mode in axes tab, starting at anchor selection
+                    if (LocatorX.inspect.isActive) {
+                        LocatorX.inspect.deactivate();
+                    }
+                    LocatorX.inspect.activate('axes-anchor');
+                });
+            }
+
+            const targetBox = document.getElementById('axesTargetBox');
+            if (targetBox) {
+                targetBox.addEventListener('click', () => {
+                    // Activate inspect mode in axes tab, starting at target selection
+                    const anchorVal = document.getElementById('axesAnchorValue');
+                    if (!anchorVal || anchorVal.textContent.includes('Not Selected') || anchorVal.textContent.includes('Select Anchor')) {
+                        LocatorX.notifications.warn('Please select an Anchor element first.');
+                        return;
+                    }
+                    if (LocatorX.inspect.isActive) {
+                        LocatorX.inspect.deactivate();
+                    }
+                    LocatorX.inspect.activate('axes-target');
+                });
             }
         },
 
@@ -954,7 +1263,7 @@ const LocatorX = {
                             <i class="bi-x-lg ms-remove-file" id="msRemoveFile"></i>
                         </div>`;
                 }
-                return UniversalDragDrop.getTemplate('msDropZone', 'msFileInput');
+                return UniversalDragDrop.getTemplate('msDropZone', 'msFileInput', '.js,.ts,.jsx,.tsx,.py,.java,.txt');
             } else {
                 return `<textarea id="msTextInput" class="search-input ms-text-input" placeholder="Paste your code or text here..."></textarea>`;
             }
@@ -991,7 +1300,22 @@ const LocatorX = {
                 if (dropZone && fileInput && typeof UniversalDragDrop !== 'undefined') {
                     UniversalDragDrop.setup(dropZone, fileInput, (files) => {
                         if (files && files.length > 0) {
-                            this.currentFile = files[0];
+                            const file = files[0];
+                            const allowedExtensions = ['.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.txt'];
+                            const maxSizeBytes = 2 * 1024 * 1024; // 2 MB
+                            const extension = '.' + file.name.split('.').pop().toLowerCase();
+
+                            if (!allowedExtensions.includes(extension)) {
+                                LocatorX.notifications.error('Unsupported file type. Allowed: JS, TS, JSX, TSX, Python, Java, TXT');
+                                return;
+                            }
+
+                            if (file.size > maxSizeBytes) {
+                                LocatorX.notifications.error('File exceeds size limit of 2 MB.');
+                                return;
+                            }
+
+                            this.currentFile = file;
                             this.renderInputState();
                         }
                     });
@@ -1051,7 +1375,7 @@ const LocatorX = {
 
             if (this.mode === 'file') {
                 if (!this.currentFile) {
-                    LocatorX.notifications.warning('Please select a file to scan.');
+                    LocatorX.notifications.warn('Please select a file to scan.');
                     this.resetScanBtn(scanBtn, originalText);
                     return;
                 }
@@ -1060,7 +1384,7 @@ const LocatorX = {
             } else {
                 const textInput = document.getElementById('msTextInput');
                 if (!textInput || !textInput.value.trim()) {
-                    LocatorX.notifications.warning('Please enter text to scan.');
+                    LocatorX.notifications.warn('Please enter text to scan.');
                     this.resetScanBtn(scanBtn, originalText);
                     return;
                 }
@@ -1084,7 +1408,7 @@ const LocatorX = {
                     matches = performAuto();
                 } else if (this.detectionMode === 'manual') {
                     matches = performManual();
-                    if (matches.length === 0) LocatorX.notifications.warning('No matches found for custom pattern.');
+                    if (matches.length === 0) LocatorX.notifications.warn('No matches found for custom pattern.');
                 } else if (this.detectionMode === 'hybrid') {
                     const autoMatches = performAuto();
                     const manualMatches = performManual();
@@ -1521,10 +1845,71 @@ const LocatorX = {
                     const isVisible = el.style.display === 'block';
                     el.style.display = isVisible ? 'none' : 'block';
                     btnEl.classList.toggle('active', !isVisible);
+
+                    // Populate history dropdown when it opens
+                    if (!isVisible && dropdown === 'customDropdown') {
+                        this.renderHistory();
+                    }
                 } else {
                     el.style.display = 'none';
                     btnEl.classList.remove('active');
                 }
+            });
+        },
+
+        async renderHistory() {
+            const dropdown = document.getElementById('customDropdown');
+            if (!dropdown) return;
+
+            const history = await LocatorX.core.getHistory();
+            const content = dropdown.querySelector('.dropdown-content');
+            if (!content) return;
+
+            if (history.length === 0) {
+                content.innerHTML = `
+                    <div class="empty-state">
+                        <i class="bi-clock-history" style="font-size: 24px; color: var(--border-dark); margin-bottom: 8px;"></i>
+                        <p style="color: var(--secondary-text); margin: 0;">No recent activity</p>
+                    </div>`;
+                return;
+            }
+
+            content.innerHTML = history.slice(0, 30).map((item, index) => {
+                const time = item.timestamp
+                    ? new Date(item.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                    : '--:--';
+                const elementLabel = item.element
+                    ? `${item.element.tagName || ''}${item.element.id ? '#' + item.element.id : ''}${item.element.className ? '.' + String(item.element.className).split(' ')[0] : ''}`
+                    : 'Element';
+                // Pick the best locator to display (CSS or first available)
+                const best = Array.isArray(item.locators)
+                    ? (item.locators.find(l => l.type === 'CSS') || item.locators[0])
+                    : null;
+                const locatorText = best ? best.locator : '—';
+
+                return `
+                    <div class="saved-item history-item" data-index="${index}" style="cursor:default;">
+                        <div class="saved-main">
+                            <div class="saved-info">
+                                <span class="saved-name" title="${LocatorX.utils.escapeHtml(locatorText)}">${LocatorX.utils.escapeHtml(elementLabel)}</span>
+                                <span class="saved-type-badge" style="opacity:0.7;">${time}</span>
+                            </div>
+                            <div class="saved-actions">
+                                <i class="bi-clipboard header-icon-button history-copy" title="Copy best locator" style="font-size:12px; margin:0 2px;" role="button" tabindex="0" data-locator="${LocatorX.utils.escapeHtml(locatorText)}"></i>
+                            </div>
+                        </div>
+                        <div class="saved-locator-code" title="${LocatorX.utils.escapeHtml(locatorText)}">${LocatorX.utils.escapeHtml(locatorText)}</div>
+                    </div>`;
+            }).join('');
+
+            // Copy handler
+            content.querySelectorAll('.history-copy').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const locator = btn.dataset.locator;
+                    const ok = await LocatorX.utils.copyToClipboard(locator);
+                    if (ok) LocatorX.notifications.success('Copied!');
+                    else LocatorX.notifications.error('Failed to copy');
+                });
             });
         },
 
@@ -1556,6 +1941,7 @@ const LocatorX = {
             this.setupSmartCorrectionSetting();
             this.setupMatchLimitSetting();
             this.setupResetBtn();
+            this.setupBlacklistRegexSetting();
             this.loadFiltersFromStorage();
             this.saveCurrentFilters('home');
             this.updateTable();
@@ -1781,6 +2167,27 @@ const LocatorX = {
             }
         },
 
+        setupBlacklistRegexSetting() {
+            const blacklistRegexCfg = document.getElementById('blacklistRegexCfg');
+            if (blacklistRegexCfg) {
+                chrome.storage.local.get(['blacklistPatterns'], (result) => {
+                    const patterns = result.blacklistPatterns || [];
+                    blacklistRegexCfg.value = patterns.join('\n');
+                    this.syncConfigToTab({ blacklistPatterns: patterns });
+                });
+
+                blacklistRegexCfg.addEventListener('change', (e) => {
+                    const lines = e.target.value.split('\n')
+                        .map(l => l.trim())
+                        .filter(l => l.length > 0);
+                    
+                    chrome.storage.local.set({ blacklistPatterns: lines });
+                    this.syncConfigToTab({ blacklistPatterns: lines });
+                    LocatorX.notifications.show('Blacklist patterns updated', 'info');
+                });
+            }
+        },
+
         setupResetBtn() {
             const resetBtn = document.getElementById('resetSettingsBtn');
             if (resetBtn) {
@@ -1804,7 +2211,8 @@ const LocatorX = {
                 'showTimestamp',
                 'smartCorrectEnabled',
                 'maxMatchLimit',
-                'locator-x-theme'
+                'locator-x-theme',
+                'blacklistPatterns'
             ];
 
             // Clear Chrome Local Storage
@@ -1842,9 +2250,11 @@ const LocatorX = {
             const smartCorrectCfg = document.getElementById('smartCorrectCfg');
             if (smartCorrectCfg) smartCorrectCfg.checked = true;
 
-
             const maxMatchLimitCfg = document.getElementById('maxMatchLimitCfg');
             if (maxMatchLimitCfg) maxMatchLimitCfg.value = 150;
+
+            const blacklistRegexCfg = document.getElementById('blacklistRegexCfg');
+            if (blacklistRegexCfg) blacklistRegexCfg.value = '';
 
             // Theme (Reset to Light)
             if (LocatorX.theme) {
@@ -1858,7 +2268,8 @@ const LocatorX = {
             this.syncConfigToTab({
                 excludeNumbers: true,
                 maxMatchLimit: 150,
-                showTimestamp: false
+                showTimestamp: false,
+                blacklistPatterns: []
             });
 
             if (LocatorX.tabs.current === 'home') this.updateTable();
@@ -2496,7 +2907,7 @@ const LocatorX = {
             });
 
             if (isDuplicate) {
-                LocatorX.notifications.warning(`Already added to "${page.name}"`);
+                LocatorX.notifications.warn(`Already added to "${page.name}"`);
                 return;
             }
 
@@ -2793,10 +3204,8 @@ const LocatorX = {
 
     settings: {
         init() {
-            const resetBtn = document.getElementById('resetSettingsBtn');
-            if (resetBtn) {
-                resetBtn.addEventListener('click', () => this.resetToDefaults());
-            }
+            // Note: resetSettingsBtn click is handled by filters.setupResetBtn()
+            // to avoid duplicate handlers and conflicting reset flows.
         },
 
         async resetToDefaults() {
@@ -3272,30 +3681,39 @@ const LocatorX = {
             }
         },
 
-        activate() {
+        activate(mode = null) {
             this.isActive = true;
-            this.currentMode = LocatorX.tabs.current;
+            this.currentMode = mode || LocatorX.tabs.current;
 
             this.updateUI();
 
             const inspectBtn = document.getElementById('inspectBtn');
-            if (this.currentMode === 'axes' && inspectBtn) {
+            const isAxesMode = this.currentMode === 'axes' || this.currentMode === 'axes-anchor' || this.currentMode === 'axes-target';
+            if (isAxesMode && inspectBtn) {
                 inspectBtn.classList.add('yellow');
 
                 // Reset UI Text
-                const anchorVal = document.getElementById('axesAnchorValue');
-                const targetVal = document.getElementById('axesTargetValue');
-                const resultVal = document.getElementById('axesResultValue');
+                if (this.currentMode !== 'axes-target') {
+                    const anchorVal = document.getElementById('axesAnchorValue');
+                    const targetVal = document.getElementById('axesTargetValue');
+                    const resultVal = document.getElementById('axesResultValue');
 
-                if (anchorVal) {
-                    anchorVal.textContent = 'Select Anchor...';
-                    anchorVal.style.color = 'var(--text-secondary)';
+                    if (anchorVal) {
+                        anchorVal.textContent = 'Select Anchor...';
+                        anchorVal.style.color = 'var(--text-secondary)';
+                    }
+                    if (targetVal) {
+                        targetVal.textContent = 'Waiting...';
+                        targetVal.style.color = 'var(--text-secondary)';
+                    }
+                    if (resultVal) resultVal.textContent = 'Capture Elements to get the result...';
+                } else {
+                    const targetVal = document.getElementById('axesTargetValue');
+                    if (targetVal) {
+                        targetVal.textContent = 'Select Target...';
+                        targetVal.style.color = 'var(--text-secondary)';
+                    }
                 }
-                if (targetVal) {
-                    targetVal.textContent = 'Waiting...';
-                    targetVal.style.color = 'var(--text-secondary)';
-                }
-                if (resultVal) resultVal.textContent = 'Capture Elements to get the result...';
             }
 
             // Lock to current tab
@@ -3907,7 +4325,7 @@ const LocatorX = {
                     const isDuplicate = saved.some(item => item.locator === locator && item.type === type);
 
                     if (isDuplicate) {
-                        LocatorX.notifications.warning('Locator already saved');
+                        LocatorX.notifications.warn('Locator already saved');
                         return;
                     }
 
@@ -3986,11 +4404,15 @@ const LocatorX = {
                 } else if (targetType === 'axes-result') {
                     LocatorX.axes.updateResultMatch(newValue);
                 } else if (targetType === 'pom-cell') {
-                    /* 
-                        Logic to update the specific locator in LocatorX.pom.pages[activePage] 
-                        would go here. For now, just ensuring the edit "sticks" in UI is the first step.
-                    */
-                    LocatorX.notifications.success('Locator updated locally');
+                    const row = element.closest('tr');
+                    let type = context.locatorType;
+                    if (context.isStrategy === 'true') {
+                        const select = row.querySelector('.strategy-select');
+                        type = select ? select.value : 'Relative XPath';
+                    }
+                    if (row && type) {
+                        await LocatorX.pom.updateLocator(row, type, newValue);
+                    }
                 } else if (targetType === 'multiscan-cell') {
                     // Real-time update for MultiScan
                     const row = element.closest('tr');

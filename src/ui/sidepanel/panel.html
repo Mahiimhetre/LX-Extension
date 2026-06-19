@@ -7,16 +7,21 @@
     <link rel="stylesheet" href="../../../styles/global.css">
     <link rel="stylesheet" href="../shared/panel.css">
     <link rel="stylesheet" href="../shared/modal.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="../shared/bootstrap-icons/bootstrap-icons.css">
     <title>LocatorX 1.0.0</title>
 </head>
 
 <body>
     <div id="devtoolsWarning" class="devtools-warning-overlay hidden">
         <div class="warning-content">
-            <i class="bi bi-exclamation-circle-fill warning-icon"></i>
-            <h2 class="warning-title">Waiting For Devtools to be closed.</h2>
-            <p class="warning-message">Locator-X Side Panel doesn't work if it is opened in DevTools</p>
+            <i class="bi bi-layout-sidebar-reverse warning-icon"></i>
+            <h2 class="warning-title">Extension DevTools Panel Active</h2>
+            <p class="warning-message">
+                The LocatorX panel is currently embedded inside Chrome DevTools.<br><br>
+                To use the <strong>Freeze / Debugger</strong> feature, open the extension
+                via the <strong>sidebar panel</strong> (click the LocatorX icon) and keep
+                <strong>F12 DevTools</strong> open separately.
+            </p>
         </div>
     </div>
 
@@ -171,7 +176,14 @@
                                             style="width: 60px; padding: 0 8px; height: 22px; text-align: center; flex: none !important;"
                                             min="10" step="10" value="150" placeholder="150">
                                     </label>
+                                 <div class="setting-group" style="display:flex; flex-direction:column; align-items:stretch; gap:6px;">
+                                    <label class="setting-label" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0;">
+                                        <span>Attribute Blacklist (Regex)</span>
+                                        <i class="bi-info-circle" title="Ignore attributes matching these regex patterns (one per line) during generation."></i>
+                                    </label>
+                                    <textarea id="blacklistRegexCfg" class="settings-textarea" placeholder="^ext-gen.*\n.*_temp$" style="width:100%; height:45px; background:var(--bg-dark); border:1px solid var(--border-dark); border-radius:4px; color:var(--text-primary); font-family:monospace; font-size:10px; padding:4px; box-sizing:border-box; resize:none;"></textarea>
                                 </div>
+
 
                             </div>
                         </div>
@@ -224,6 +236,8 @@
                             data-feature="locator.attributeXpath" checked>Attribute</label>
                     <label><input type="checkbox" class="nested-loc-type" id="startsWithXpathLocator"
                             value="startsWithXpath" data-feature="locator.startsWithXpath" checked>Starts With</label>
+                    <label><input type="checkbox" class="nested-loc-type" id="orXpathLocator"
+                            value="orXpath" data-feature="locator.orXpath" checked>OR XPath</label>
                     <label><input type="checkbox" class="nested-loc-type" id="cssXpathLocator" value="cssXpath"
                             data-feature="locator.cssXpath" checked>CSS XPath</label>
                 </fieldset>
@@ -249,8 +263,6 @@
                     <div class="input-group">
                         <input type="text" class="search-input" id="searchInput"
                             placeholder="Enter selector or element..." autocomplete="off">
-                        <i class="bi bi-x-circle-fill clear-btn hidden" id="searchSearchClearBtn" role="button"
-                            tabindex="0" aria-label="Clear Search Input"></i>
                         <i class="bi bi-x-circle-fill clear-btn hidden" id="searchSearchClearBtn" role="button"
                             tabindex="0" aria-label="Clear Search"></i>
                         <div id="searchDropdown" class="search-dropdown"></div>
@@ -309,6 +321,8 @@
                             aria-label="Rename Page"></i>
                         <i class="bi-trash action-btn" id="deletePageBtn" title="Delete Page" role="button" tabindex="0"
                             aria-label="Delete Page"></i>
+                        <i class="bi-download action-btn" id="exportPageBtn" title="Export Page Code" role="button" tabindex="0"
+                            aria-label="Export Page Code"></i>
                     </div>
                 </div>
                 <div class="table-container">

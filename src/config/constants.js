@@ -45,7 +45,8 @@ const LocatorXConfig = {
         'jsPath': 'JS Path',
         'jquery': 'jQuery',
         'absoluteXpath': 'Absolute XPath',
-        'relativeXpath': 'Relative XPath'
+        'relativeXpath': 'Relative XPath',
+        'orXpath': 'OR XPath'
     },
 
     // Attributes prioritized during CSS and XPath generation
@@ -70,7 +71,7 @@ const LocatorXConfig = {
             'relativeXpath', 'absoluteXpath',
             'containsXpath', 'startsWithXpath', 'indexedXpath',
             'linkTextXpath', 'pLinkTextXpath', 'attributeXpath',
-            'cssXpath', 'jsPath', 'jquery'
+            'cssXpath', 'jsPath', 'jquery', 'orXpath'
         ]
     },
 

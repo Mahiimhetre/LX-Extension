@@ -97,7 +97,13 @@ class LocatorXModal {
 
     handleConfirm() {
         const input = this.overlay.querySelector('.modal-input');
-        const value = input ? input.value : true;
+        const select = this.overlay.querySelector('.modal-select');
+        let value = true;
+        if (input) {
+            value = input.value;
+        } else if (select) {
+            value = select.value;
+        }
         this.close(value);
     }
 

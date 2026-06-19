@@ -22,7 +22,7 @@ class DOMScanner {
 
     loadInitialConfig() {
         if (chrome.storage && chrome.storage.local) {
-            chrome.storage.local.get(['excludeNumbers', 'maxMatchLimit'], (result) => {
+            chrome.storage.local.get(['excludeNumbers', 'maxMatchLimit', 'blacklistPatterns'], (result) => {
                 this.updateInternalConfig(result);
             });
         }
@@ -32,6 +32,11 @@ class DOMScanner {
         if (config.excludeNumbers !== undefined) {
             this.settings.excludeNumbers = config.excludeNumbers;
             if (this.generator) this.generator.setConfig({ excludeNumbers: config.excludeNumbers });
+        }
+        
+        if (config.blacklistPatterns !== undefined) {
+            this.settings.blacklistPatterns = config.blacklistPatterns;
+            if (this.generator) this.generator.setConfig({ blacklistPatterns: config.blacklistPatterns });
         }
         
         if (config.maxMatchLimit !== undefined) {
@@ -130,10 +135,13 @@ class DOMScanner {
                 else { this.clearHighlights('matches'); }
             } else if (message.action === 'clearMatchHighlights') {
                 this.clearHighlights('matches');
-            } else if (message.action === 'swapAxes') {
-                this.swapAxes();
             } else if (message.action === 'updateConfig') {
                 this.updateInternalConfig(message.config);
+            } else if (message.action === 'executeDebugger') {
+                setTimeout(() => {
+                    debugger;
+                }, 50);
+                sendResponse({ success: true });
             }
         });
 
@@ -253,8 +261,16 @@ class DOMScanner {
         this.currentMode = mode;
 
         // Reset Axes State
-        if (mode === 'axes') {
+        if (mode === 'axes' || mode === 'axes-anchor') {
             this.axesState = { step: 1, anchor: null };
+        } else if (mode === 'axes-target') {
+            if (!this.axesState.anchor) {
+                // If target mode is requested but anchor doesn't exist, fall back to step 1
+                this.currentMode = 'axes-anchor';
+                this.axesState = { step: 1, anchor: null };
+            } else {
+                this.axesState.step = 2;
+            }
         } else {
             this.axesState = { step: 0, anchor: null };
         }
@@ -265,7 +281,9 @@ class DOMScanner {
         document.addEventListener('contextmenu', this.handleRightClick, true);
 
         this.clearHighlights('active');
-        this.clearHighlights('axes');
+        if (this.currentMode !== 'axes-target') {
+            this.clearHighlights('axes');
+        }
         this.isLocked = false;
         document.body.style.userSelect = 'none';
         document.body.style.cursor = 'crosshair';
@@ -321,7 +339,7 @@ class DOMScanner {
             if (!element) return;
 
             // Handle Axes Mode Logic
-            if (this.currentMode === 'axes') {
+            if (this.currentMode === 'axes' || this.currentMode === 'axes-anchor' || this.currentMode === 'axes-target') {
                 if (this.axesState.step === 1) {
                     // Capture Anchor
                     this.axesState.anchor = element;
@@ -427,13 +445,14 @@ class DOMScanner {
 
         // Add highlight attribute
         // Check current mode to set value if needed (default to empty or 'home')
-        const mode = this.currentMode && this.currentMode !== 'axes' ? this.currentMode : 'home';
+        const mode = this.currentMode && this.currentMode !== 'axes' && this.currentMode !== 'axes-anchor' && this.currentMode !== 'axes-target' ? this.currentMode : 'home';
 
         // For Axes, we use 'anchor' or 'target', handled by logic above.
         // But for hover, we just show standard highlight unless strict axes logic prevails.
         // In Axes mode, hover is essentially "potential target" (step 2) or "potential anchor" (step 1)
         let highlightValue = (mode === 'home') ? '' : mode;
-        if (this.currentMode === 'axes') {
+        const isAxesMode = this.currentMode === 'axes' || this.currentMode === 'axes-anchor' || this.currentMode === 'axes-target';
+        if (isAxesMode) {
             if (element === this.axesState.anchor) {
                 highlightValue = 'anchor';
             } else { highlightValue = (this.axesState.step === 1) ? 'anchor' : 'target'; }
@@ -838,11 +857,11 @@ class DOMScanner {
             'copy-id': 'id',
             'copy-name': 'name',
             'copy-class': 'className',
-            'copy-rel-xpath': 'xpath',
+            'copy-rel-xpath': 'relativeXpath',
             'copy-css': 'css',
             'copy-jquery': 'jquery',
             'copy-js-path': 'jsPath',
-            'copy-abs-xpath': 'absoluteXPath'
+            'copy-abs-xpath': 'absoluteXpath'
         };
 
         const strategy = typeMap[menuId];

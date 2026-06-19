@@ -24,10 +24,15 @@ chrome.devtools.panels.elements.createSidebarPane(
     (sidebar) => {
         sidebar.setPage('src/ui/devtools/devtools.html');
 
+        let devtoolsPort = null;
+
         sidebar.onShown.addListener(() => {
             chrome.storage.local.set({ devtoolsActive: true });
-            // Establish a port to notify background script we are alive
-            chrome.runtime.connect({ name: 'locatorx-devtools' });
+            // Disconnect previous port before creating a new one to avoid leaks
+            if (devtoolsPort) {
+                try { devtoolsPort.disconnect(); } catch (e) { }
+            }
+            devtoolsPort = chrome.runtime.connect({ name: 'locatorx-devtools' });
         });
 
         sidebar.onHidden.addListener(() => {

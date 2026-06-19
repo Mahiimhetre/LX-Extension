@@ -1,0 +1,18 @@
+# AI Pair Programming Instructions
+
+## 🎯 Primary Goal: Robust, True, Logical, and Error-Free Answers
+- **Logical Validation:** Before answering any question or writing any code, analyze the developer's request for logical consistency. If a request contains incorrect assumptions, flawed logic, or potential design weaknesses, identify them immediately, explain *why* they are incorrect, and propose a sound, reasonable alternative.
+- **Factual & Technical Correctness:** Do not hallucinate, guess, or extrapolate APIs. If you do not have enough context or if a technical detail is ambiguous, stop and ask clarifying questions instead of guessing.
+- **Explanatory Reasoning:** Every response must include a clear explanation of *why* the proposed solution works, the logical steps behind the choice, and any security, performance, or maintenance implications.
+
+## 🔍 Pre-Edit Reuse & Refactoring Check (Mandatory)
+- **Leverage Existing Code First:** Before making *any* file edit or creating *new* logic, search the codebase. Check if you can achieve the desired feature by extending, refactoring, or reusing existing code, functions, or utilities instead of adding new, redundant logic.
+- **Avoid Duplication:** If a helper function, layout component, utility class, or configuration option already exists, you must reuse or adapt it. Do not bloat the codebase with duplicate code blocks.
+
+## 💻 Coding Standards & Code Quality
+- **Complete and Drop-in Ready:** Never use placeholders (like `// TODO` or `// ... rest of code`). The code you provide must be fully written out, logically complete, and syntactically correct.
+- **Preservation of Existing Logic:** Do not overwrite or drop existing, unrelated code or comments.
+- **Comprehensive Error Boundaries:** Ensure code structures have logical error-handling paths and fail gracefully with diagnostic details.
+
+## 🛡️ Safety & Command Execution
+- **System & Environment Auditing:** Critically evaluate any command, git configuration change, or package install. If a command is redundant, unsafe, or globally disruptive, explain the risk and suggest the narrowest, safest local alternative.

@@ -153,13 +153,12 @@ const handleAuthSync = (message, sendResponse) => {
         if (user) {
             chrome.storage.local.get(['user', 'authToken'], (result) => {
                 const updatedUser = { ...result.user, ...user, _lastUpdated: Date.now() };
+                const tokenToSync = user.token || result.authToken || 'dummy-token-for-sync';
                 const updates = {
                     user: updatedUser,
-                    'locator-x-plan': updatedUser.plan || 'free'
+                    'locator-x-plan': updatedUser.plan || 'free',
+                    authToken: tokenToSync
                 };
-                if (!result.authToken) {
-                    updates.authToken = 'dummy-token-for-sync';
-                }
                 chrome.storage.local.set(updates, () => {
                     chrome.runtime.sendMessage({ action: 'AUTH_STATE_CHANGED', user: updatedUser }).catch(() => { });
                     setupContextMenus(); // Rebuild menus

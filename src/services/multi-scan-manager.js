@@ -3,11 +3,40 @@ class MultiScanManager {
         // No state needed really, mostly pure functions, but good for grouping
     }
 
+    readFile(file) {
+        const allowedExtensions = ['.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.txt'];
+        const maxSizeBytes = 2 * 1024 * 1024; // 2 MB
+
+        if (!file) {
+            return Promise.reject(new Error('No file provided'));
+        }
+
+        const extension = '.' + file.name.split('.').pop().toLowerCase();
+        if (!allowedExtensions.includes(extension)) {
+            return Promise.reject(new Error('Unsupported file type. Allowed: JS, TS, JSX, TSX, Python, Java, TXT'));
+        }
+
+        if (file.size > maxSizeBytes) {
+            return Promise.reject(new Error('File exceeds size limit of 2 MB'));
+        }
+
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                resolve(event.target.result);
+            };
+            reader.onerror = (error) => {
+                reject(error);
+            };
+            reader.readAsText(file);
+        });
+    }
+
     getCommonPatterns(framework) {
         if (typeof LocatorXPatterns === 'undefined') return {};
         // MultiScan context expects nested structure or flat array depending on caller
         if (framework === 'all') {
-             return LocatorXPatterns.getPatterns('all');
+            return LocatorXPatterns.getPatterns('all');
         }
         return { find: LocatorXPatterns.getPatterns(framework) };
     }
@@ -40,7 +69,7 @@ class MultiScanManager {
 
     autoScan(text, framework) {
         if (typeof LocatorXPatterns === 'undefined') return [];
-        
+
         const allPatterns = LocatorXPatterns.getPatterns(framework);
         let allMatches = [];
         const uniqueLocators = new Set();
@@ -66,7 +95,9 @@ class MultiScanManager {
     }
 }
 
-// Expose to window for Panel Context
-if (typeof window !== 'undefined') {
+// Expose to window for Panel Context or module for Node.js
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = MultiScanManager;
+} else if (typeof window !== 'undefined') {
     window.MultiScanManager = MultiScanManager;
 }
