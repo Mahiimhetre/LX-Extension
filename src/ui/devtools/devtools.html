@@ -22,6 +22,60 @@
                     data-feature="module.debugger" role="button" tabindex="0" aria-label="Freeze Page"></i>
                 <i class="bi-circle-half theme-button header-icon-button" id="themeBtn" title="Change theme"
                     data-feature="ui.theme.dark" role="button" tabindex="0" aria-label="Change theme"></i>
+                <div class="about-container">
+                    <i class="bi-info-circle header-icon-button" id="aboutBtn" title="About & Policies" role="button"
+                        tabindex="0" aria-label="About & Policies"></i>
+                    <div id="aboutHeaderDropdown" class="navdropdown">
+                        <div class="dropdown-header">
+                            <strong>About & Policies</strong>
+                        </div>
+                        <div class="dropdown-content" style="padding: 4px 0;">
+                            <!-- About Item -->
+                            <details name="about-policies" open style="outline: none;">
+                                <summary class="dropdown-item" style="cursor: pointer; outline: none; padding: 6px 8px;">About LocatorX</summary>
+                                <div style="padding: 6px 8px 8px 16px; font-size: 11px; color: var(--secondary-text); line-height: 1.4;">
+                                    <p style="margin: 0 0 4px 0; font-weight: 600; color: var(--accent);">LocatorX v1.0.0</p>
+                                    <p style="margin: 0 0 6px 0;">A powerful locator generator and manager for web automation.</p>
+                                    <ul style="margin: 0; padding-left: 14px;">
+                                        <li style="margin-bottom: 2px;">Generate 15+ types of locators</li>
+                                        <li style="margin-bottom: 2px;">Manage Page Object Models (POM)</li>
+                                        <li style="margin-bottom: 2px;">Axes locator generation</li>
+                                        <li style="margin-bottom: 2px;">Code generation with custom patterns</li>
+                                        <li style="margin-bottom: 2px;">Link auditor, multi‑scan, and more</li>
+                                    </ul>
+                                </div>
+                            </details>
+                            
+                            <!-- Legal Policies Item -->
+                            <details name="about-policies" style="outline: none;">
+                                <summary class="dropdown-item" style="cursor: pointer; outline: none; padding: 6px 8px;">Legal Policies</summary>
+                                <div style="padding: 6px 8px 8px 16px; font-size: 11px; color: var(--secondary-text); line-height: 1.4; max-height: 120px; overflow-y: auto;">
+                                    <strong style="color: var(--accent);">1. Disclaimer</strong>
+                                    <p style="margin: 2px 0 6px 0; font-size: 10px;">THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES ARE DISCLAIMED.</p>
+                                    
+                                    <strong style="color: var(--accent);">2. Privacy Policy</strong>
+                                    <p style="margin: 2px 0 6px 0; font-size: 10px;">Stores data only locally in your browser's storage. No data is transmitted to third-party servers.</p>
+                                    
+                                    <strong style="color: var(--accent);">3. Terms of Use</strong>
+                                    <p style="margin: 2px 0 0 0; font-size: 10px;">Permitted for automation testing purposes. Do not use for illegal testing.</p>
+                                </div>
+                            </details>
+
+                            <!-- License Item -->
+                            <details name="about-policies" style="outline: none;">
+                                <summary class="dropdown-item" style="cursor: pointer; outline: none; padding: 6px 8px;">License</summary>
+                                <div style="padding: 6px 8px 8px 16px; font-size: 11px; color: var(--secondary-text); line-height: 1.4; max-height: 100px; overflow-y: auto;">
+                                    <p style="margin: 0 0 4px 0; font-weight: 600; color: var(--accent);">MIT License</p>
+                                    <pre style="margin: 0; font-family: monospace; white-space: pre-wrap; font-size: 9px; line-height: 1.2;">Copyright (c) 2026 Locator-X
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software...
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND...</pre>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="header-content">
                 <div class="title-block">
@@ -166,13 +220,18 @@
                                     </label>
                                  <div class="setting-group" style="display:flex; flex-direction:column; align-items:stretch; gap:6px;">
                                     <label class="setting-label" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0;">
+                                        <span>Extension Ignore URLs (Regex)</span>
+                                        <i class="bi-info-circle" title="Disable LocatorX completely on tab URLs matching these regex patterns (one per line)."></i>
+                                    </label>
+                                    <textarea id="extensionIgnoreUrls" class="settings-textarea" placeholder="^https?://(www\.)?ignore-site\.com" style="width:100%; height:45px; background:var(--bg-dark); border:1px solid var(--border-dark); border-radius:4px; color:var(--text-primary); font-family:monospace; font-size:10px; padding:4px; box-sizing:border-box; resize:none;"></textarea>
+                                </div>
+                                 <div class="setting-group" style="display:flex; flex-direction:column; align-items:stretch; gap:6px;">
+                                    <label class="setting-label" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0;">
                                         <span>Attribute Blacklist (Regex)</span>
                                         <i class="bi-info-circle" title="Ignore attributes matching these regex patterns (one per line) during generation."></i>
                                     </label>
                                     <textarea id="blacklistRegexCfg" class="settings-textarea" placeholder="^ext-gen.*\n.*_temp$" style="width:100%; height:45px; background:var(--bg-dark); border:1px solid var(--border-dark); border-radius:4px; color:var(--text-primary); font-family:monospace; font-size:10px; padding:4px; box-sizing:border-box; resize:none;"></textarea>
                                 </div>
-
-
                             </div>
                         </div>
                     </li>
@@ -265,12 +324,12 @@
                 </div>
                 <div class="control-group">
                     <div class="input-group">
-                        <input type="text" class="save-input" placeholder="Enter name to save..."
+                        <input type="text" id="saveLocatorInput" class="save-input" placeholder="Enter name to save..."
                             style="font-size: 10px;">
                         <i class="bi bi-x-circle-fill clear-btn hidden" role="button" tabindex="0"
                             aria-label="Clear Name Input"></i>
                     </div>
-                    <button class="save-btn" title="Save">
+                    <button class="save-btn" id="saveLocatorBtn" title="Save">
                         Save
                     </button>
                 </div>
@@ -418,7 +477,7 @@
                     </div>
                 </div>
             </div>
-            <span class="footer-text">© 2024 Locator-X</span>
+            <span class="footer-text">© 2026 Locator-X</span>
             <div class="footer-links">
                 <span class="version-badge">v1.0.0</span>
             </div>
@@ -427,6 +486,7 @@
 
     <script src="../shared/site-support.js"></script>
     <script src="../../config/constants.js"></script>
+    <script src="../../utils/secure-json.js"></script>
     <script src="../../services/storage-manager.js"></script>
     <script src="../../services/filter-manager.js"></script>
     <script src="../../config/patterns.js"></script>

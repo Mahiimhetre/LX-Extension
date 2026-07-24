@@ -108,6 +108,9 @@ class LocatorXCore {
     }
 
     async savePOMPage(page) {
+        if (page && typeof page.name === 'string') {
+            page.name = page.name.replace(/<\/?[^>]+(>|$)/g, "");
+        }
         return await this.storage.savePOMPage(page);
     }
 

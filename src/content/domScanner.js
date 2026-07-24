@@ -128,6 +128,135 @@ class DOMScanner {
                     console.error('[DOMScanner] batchEvaluate error:', e);
                     sendResponse({ error: e.toString() });
                 }
+            } else if (message.action === 'extractPageLinks') {
+                try {
+                    const links = [];
+                    let linkIdCounter = 0;
+                    
+                    const isHeaderOrFooterLink = (el) => {
+                        let current = el;
+                        while (current && current !== document) {
+                            const tagName = current.tagName?.toUpperCase();
+                            if (tagName === 'HEADER' || tagName === 'FOOTER') {
+                                return true;
+                            }
+                            
+                            const id = current.id ? String(current.id).toLowerCase() : '';
+                            const className = typeof current.className === 'string' ? current.className.toLowerCase() : '';
+                            
+                            if (id.includes('header') || id.includes('footer')) {
+                                return true;
+                            }
+                            if (className.includes('header') || className.includes('footer')) {
+                                return true;
+                            }
+                            
+                            current = current.parentNode || current.host;
+                        }
+                        return false;
+                    };
+                    
+                    const scanLinks = (root) => {
+                        const elements = root.querySelectorAll('a');
+                        for (let i = 0; i < elements.length; i++) {
+                            const a = elements[i];
+                            if (this.generator && this.generator.isExtensionElement && this.generator.isExtensionElement(a)) continue;
+                            if (message.skipHeaderFooter && isHeaderOrFooterLink(a)) continue;
+                            
+                            let linkId = a.getAttribute('data-lx-link-id');
+                            if (!linkId) {
+                                linkId = `lx-link-${linkIdCounter++}`;
+                                a.setAttribute('data-lx-link-id', linkId);
+                            }
+                            
+                            const rect = a.getBoundingClientRect();
+                            const locators = this.generateLocators(a, LocatorXConfig.FILTER_GROUPS.CORE);
+                            links.push({
+                                id: linkId,
+                                text: (a.textContent || a.innerText || '').replace(/\s+/g, ' ').trim() || '(No Text)',
+                                href: a.getAttribute('href') || '',
+                                locators: locators,
+                                rect: {
+                                    top: rect.top,
+                                    left: rect.left,
+                                    width: rect.width,
+                                    height: rect.height
+                                }
+                            });
+                        }
+                        
+                        const allNodes = root.querySelectorAll('*');
+                        for (let i = 0; i < allNodes.length; i++) {
+                            const el = allNodes[i];
+                            if (el.shadowRoot) {
+                                scanLinks(el.shadowRoot);
+                            }
+                        }
+                    };
+                    
+                    scanLinks(document);
+                    sendResponse({ success: true, links });
+                } catch (err) {
+                    console.error('[DOMScanner] extractPageLinks error:', err);
+                    sendResponse({ success: false, error: err.toString() });
+                }
+                return true;
+            } else if (message.action === 'highlightLinkElement') {
+                this.clearHighlights('matches');
+                const findLinkById = (root, linkId) => {
+                    let el = root.querySelector(`a[data-lx-link-id="${linkId}"]`);
+                    if (el) return el;
+                    const all = root.querySelectorAll('*');
+                    for (let i = 0; i < all.length; i++) {
+                        if (all[i].shadowRoot) {
+                            el = findLinkById(all[i].shadowRoot, linkId);
+                            if (el) return el;
+                        }
+                    }
+                    return null;
+                };
+                const el = findLinkById(document, message.id);
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+                    el.setAttribute('lx-high', 'match');
+                    this.matchedElements = [el];
+                    
+                    // Visual feedback outline flash
+                    const oldTransition = el.style.transition;
+                    const oldOutline = el.style.outline;
+                    el.style.transition = 'outline 0.3s ease';
+                    el.style.outline = '2px dashed var(--accent, #3498db)';
+                    setTimeout(() => {
+                        el.style.outline = oldOutline;
+                        el.style.transition = oldTransition;
+                    }, 2000);
+                    
+                    sendResponse({ success: true });
+                } else {
+                    sendResponse({ success: false, error: 'Element not found' });
+                }
+                return true;
+            } else if (message.action === 'updateLinkHref') {
+                const findLinkById = (root, linkId) => {
+                    let el = root.querySelector(`a[data-lx-link-id="${linkId}"]`);
+                    if (el) return el;
+                    const all = root.querySelectorAll('*');
+                    for (let i = 0; i < all.length; i++) {
+                        if (all[i].shadowRoot) {
+                            el = findLinkById(all[i].shadowRoot, linkId);
+                            if (el) return el;
+                        }
+                    }
+                    return null;
+                };
+                const el = findLinkById(document, message.id);
+                if (el) {
+                    el.setAttribute('href', message.href);
+                    sendResponse({ success: true });
+                } else {
+                    sendResponse({ success: false, error: 'Element not found' });
+                }
+                return true;
             } else if (message.action === 'contextMenuLocator') {
                 this.handleContextMenuLocator(message.type);
             } else if (message.action === 'highlightMatches') {

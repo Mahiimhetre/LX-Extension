@@ -34,6 +34,60 @@
                     data-feature="module.debugger" role="button" tabindex="0" aria-label="Freeze Page"></i>
                 <i class="bi-circle-half theme-button header-icon-button" id="themeBtn" title="Change theme"
                     data-feature="ui.theme.dark" role="button" tabindex="0" aria-label="Change theme"></i>
+                <div class="about-container">
+                    <i class="bi-info-circle header-icon-button" id="aboutBtn" title="About & Policies" role="button"
+                        tabindex="0" aria-label="About & Policies"></i>
+                    <div id="aboutHeaderDropdown" class="navdropdown">
+                        <div class="dropdown-header">
+                            <strong>About & Policies</strong>
+                        </div>
+                        <div class="dropdown-content" style="padding: 4px 0;">
+                            <!-- About Item -->
+                            <details name="about-policies" open style="outline: none;">
+                                <summary class="dropdown-item" style="cursor: pointer; outline: none; padding: 6px 8px;">About LocatorX</summary>
+                                <div style="padding: 6px 8px 8px 16px; font-size: 11px; color: var(--secondary-text); line-height: 1.4;">
+                                    <p style="margin: 0 0 4px 0; font-weight: 600; color: var(--accent);">LocatorX v1.0.0</p>
+                                    <p style="margin: 0 0 6px 0;">A powerful locator generator and manager for web automation.</p>
+                                    <ul style="margin: 0; padding-left: 14px;">
+                                        <li style="margin-bottom: 2px;">Generate 15+ types of locators</li>
+                                        <li style="margin-bottom: 2px;">Manage Page Object Models (POM)</li>
+                                        <li style="margin-bottom: 2px;">Axes locator generation</li>
+                                        <li style="margin-bottom: 2px;">Code generation with custom patterns</li>
+                                        <li style="margin-bottom: 2px;">Link auditor, multi‑scan, and more</li>
+                                    </ul>
+                                </div>
+                            </details>
+                            
+                            <!-- Legal Policies Item -->
+                            <details name="about-policies" style="outline: none;">
+                                <summary class="dropdown-item" style="cursor: pointer; outline: none; padding: 6px 8px;">Legal Policies</summary>
+                                <div style="padding: 6px 8px 8px 16px; font-size: 11px; color: var(--secondary-text); line-height: 1.4; max-height: 120px; overflow-y: auto;">
+                                    <strong style="color: var(--accent);">1. Disclaimer</strong>
+                                    <p style="margin: 2px 0 6px 0; font-size: 10px;">THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES ARE DISCLAIMED.</p>
+                                    
+                                    <strong style="color: var(--accent);">2. Privacy Policy</strong>
+                                    <p style="margin: 2px 0 6px 0; font-size: 10px;">Stores data only locally in your browser's storage. No data is transmitted to third-party servers.</p>
+                                    
+                                    <strong style="color: var(--accent);">3. Terms of Use</strong>
+                                    <p style="margin: 2px 0 0 0; font-size: 10px;">Permitted for automation testing purposes. Do not use for illegal testing.</p>
+                                </div>
+                            </details>
+
+                            <!-- License Item -->
+                            <details name="about-policies" style="outline: none;">
+                                <summary class="dropdown-item" style="cursor: pointer; outline: none; padding: 6px 8px;">License</summary>
+                                <div style="padding: 6px 8px 8px 16px; font-size: 11px; color: var(--secondary-text); line-height: 1.4; max-height: 100px; overflow-y: auto;">
+                                    <p style="margin: 0 0 4px 0; font-weight: 600; color: var(--accent);">MIT License</p>
+                                    <pre style="margin: 0; font-family: monospace; white-space: pre-wrap; font-size: 9px; line-height: 1.2;">Copyright (c) 2026 Locator-X
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software...
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND...</pre>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="header-content">
                 <div class="title-block">
@@ -111,6 +165,85 @@
                             </div>
                         </div>
                     </li>
+                    <li class="nav-item" id="navLinkAuditor" data-feature="module.checkLinks" role="button" tabindex="0" aria-label="Link Auditor">
+                        <i class="bi-link-45deg"></i>
+                        <div id="linkAuditorDropdown" class="navdropdown">
+                            <div class="dropdown-header">
+                                <strong>Link Auditor</strong>
+                                <div style="display: flex; gap: 8px; align-items: center; margin-left: auto;">
+                                    <i class="bi-gear reset-settings-btn" id="auditorSettingsToggleBtn" title="Link Auditor Settings" role="button" tabindex="0" aria-label="Link Auditor Settings"></i>
+                                    <i class="bi-download reset-settings-btn" id="auditorExportBtn" data-feature="ui.checkLinks.export" title="Export Checked Links" role="button" tabindex="0" aria-label="Export Checked Links"></i>
+                                </div>
+                            </div>
+                            <div class="auditor-dropdown-content">
+                                <!-- Collapsible Settings Section -->
+                                <div id="auditorSettingsPanel" class="auditor-settings-panel hidden" style="border-bottom: 1px solid var(--border-light); padding-bottom: 8px; margin-bottom: 4px; display: flex; flex-direction: column; gap: 6px;">
+                                    <label class="setting-option" style="justify-content: space-between; display: flex; align-items: center;">
+                                        <span>Timeout (seconds)</span>
+                                        <input type="number" id="mainAuditorTimeout" class="search-input"
+                                            style="width: 60px; padding: 0 8px; height: 22px; text-align: center; flex: none !important;"
+                                            min="1" max="30" value="5">
+                                    </label>
+                                    <label class="setting-option" style="justify-content: space-between; display: flex; align-items: center;">
+                                        <span>Max Concurrency</span>
+                                        <input type="number" id="mainAuditorConcurrency" class="search-input"
+                                            style="width: 60px; padding: 0 8px; height: 22px; text-align: center; flex: none !important;"
+                                            min="1" max="20" value="5">
+                                    </label>
+                                    <label class="setting-option" style="justify-content: space-between; display: flex; align-items: center;" data-feature="ui.checkLinks.skipHeaderFooter">
+                                        <span>Skip Header/Footer Links</span>
+                                        <input type="checkbox" id="auditorSkipHeaderFooter" style="cursor: pointer; outline: none; margin: 0;">
+                                    </label>
+                                    <div class="setting-group" style="display:flex; flex-direction:column; align-items:stretch; gap:4px;">
+                                        <label class="setting-label" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0; font-size:10px;">
+                                            <span>Exclusion Domains (Regex)</span>
+                                            <i class="bi-info-circle" title="Ignore URLs matching these regex patterns (one per line) during scan."></i>
+                                        </label>
+                                        <textarea id="mainAuditorExclusions" class="settings-textarea" placeholder="^https?://(www\.)?google\.com" style="width:100%; height:40px; background:var(--bg-dark); border:1px solid var(--border-dark); border-radius:4px; color:var(--text-primary); font-family:monospace; font-size:10px; padding:4px; box-sizing:border-box; resize:none;" data-feature="ui.checkLinks.exclusions"></textarea>
+                                    </div>
+                                    <div class="setting-group" style="display:flex; flex-direction:column; align-items:stretch; gap:4px;">
+                                        <label class="setting-label" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0; font-size:10px;">
+                                            <span>Ignore Page URLs (Regex)</span>
+                                            <i class="bi-info-circle" title="Disable Link Auditor on page URLs matching these regex patterns (one per line)."></i>
+                                        </label>
+                                        <textarea id="auditorIgnoreUrls" class="settings-textarea" placeholder="^https?://(www\.)?ignore-site\.com" style="width:100%; height:40px; background:var(--bg-dark); border:1px solid var(--border-dark); border-radius:4px; color:var(--text-primary); font-family:monospace; font-size:10px; padding:4px; box-sizing:border-box; resize:none;"></textarea>
+                                    </div>
+                                </div>
+
+                                <!-- Action Buttons & Status Badges -->
+                                <div class="auditor-controls">
+                                    <button class="auditor-action-btn" id="auditorStartBtn" style="flex:1;">Audit Links</button>
+                                    <button class="auditor-action-btn hidden" id="auditorStopBtn" style="background:var(--status-red-text); flex:1;">Stop</button>
+                                </div>
+
+                                <!-- Progress Bar (hidden by default) -->
+                                <div id="auditorProgressContainer" class="auditor-progress-container hidden">
+                                    <div class="auditor-progress-info">
+                                        <span id="auditorProgressLabel">Auditing links...</span>
+                                        <span id="auditorProgressPercent">0%</span>
+                                    </div>
+                                    <div class="auditor-progress-bg">
+                                        <div id="auditorProgressBar"></div>
+                                    </div>
+                                </div>
+
+                                <div class="auditor-stats">
+                                    <span class="badge-count stat-all active" id="statAll" style="cursor:pointer; background:var(--surface-3); color:var(--primary-text);">All: <span id="statAllCount">0</span></span>
+                                    <span class="badge-count stat-valid" id="statValid" style="cursor:pointer; background:var(--status-green-text); color:white;">Valid: <span id="statValidCount">0</span></span>
+                                    <span class="badge-count stat-redirect" id="statRedirect" style="cursor:pointer; background:var(--warning); color:black;">Redirect: <span id="statRedirectCount">0</span></span>
+                                    <span class="badge-count stat-broken" id="statBroken" style="cursor:pointer; background:var(--status-red-text); color:white;">Broken: <span id="statBrokenCount">0</span></span>
+                                </div>
+
+                                <!-- Scrollable Links List -->
+                                <div class="auditor-links-container" id="auditorLinksList">
+                                    <div class="empty-state">
+                                        <i class="bi-link-45deg" style="font-size: 24px; color: var(--border-dark); margin-bottom: 8px;"></i>
+                                        <p style="color: var(--secondary-text); margin: 0;">Click 'Audit Links' to start</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
                     <li class="nav-item" id="navSettings" role="button" tabindex="0" aria-label="Settings">
                         <i class="bi-gear"></i>
                         <div id="settingsDropdown" class="navdropdown">
@@ -178,13 +311,18 @@
                                     </label>
                                  <div class="setting-group" style="display:flex; flex-direction:column; align-items:stretch; gap:6px;">
                                     <label class="setting-label" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0;">
+                                        <span>Extension Ignore URLs (Regex)</span>
+                                        <i class="bi-info-circle" title="Disable LocatorX completely on tab URLs matching these regex patterns (one per line)."></i>
+                                    </label>
+                                    <textarea id="extensionIgnoreUrls" class="settings-textarea" placeholder="^https?://(www\.)?ignore-site\.com" style="width:100%; height:45px; background:var(--bg-dark); border:1px solid var(--border-dark); border-radius:4px; color:var(--text-primary); font-family:monospace; font-size:10px; padding:4px; box-sizing:border-box; resize:none;"></textarea>
+                                </div>
+                                 <div class="setting-group" style="display:flex; flex-direction:column; align-items:stretch; gap:6px;">
+                                    <label class="setting-label" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0;">
                                         <span>Attribute Blacklist (Regex)</span>
                                         <i class="bi-info-circle" title="Ignore attributes matching these regex patterns (one per line) during generation."></i>
                                     </label>
                                     <textarea id="blacklistRegexCfg" class="settings-textarea" placeholder="^ext-gen.*\n.*_temp$" style="width:100%; height:45px; background:var(--bg-dark); border:1px solid var(--border-dark); border-radius:4px; color:var(--text-primary); font-family:monospace; font-size:10px; padding:4px; box-sizing:border-box; resize:none;"></textarea>
                                 </div>
-
-
                             </div>
                         </div>
                     </li>
@@ -277,12 +415,12 @@
                 </div>
                 <div class="control-group">
                     <div class="input-group">
-                        <input type="text" class="save-input" placeholder="Enter name to save..."
+                        <input type="text" id="saveLocatorInput" class="save-input" placeholder="Enter name to save..."
                             style="font-size: 10px;">
                         <i class="bi bi-x-circle-fill clear-btn hidden" role="button" tabindex="0"
                             aria-label="Clear Name Input"></i>
                     </div>
-                    <button class="save-btn" title="Save">
+                    <button class="save-btn" id="saveLocatorBtn" title="Save">
                         Save
                     </button>
                 </div>
@@ -430,7 +568,7 @@
                     </div>
                 </div>
             </div>
-            <span class="footer-text">© 2024 Locator-X</span>
+            <span class="footer-text">© 2026 Locator-X</span>
             <div class="footer-links">
                 <span class="version-badge">v1.0.0</span>
             </div>
@@ -439,6 +577,7 @@
 
     <script src="../shared/site-support.js"></script>
     <script src="../../config/constants.js"></script>
+    <script src="../../utils/secure-json.js"></script>
     <script src="../../services/storage-manager.js"></script>
     <script src="../../services/filter-manager.js"></script>
     <script src="../../config/patterns.js"></script>

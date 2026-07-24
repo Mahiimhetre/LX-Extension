@@ -435,6 +435,11 @@
   position: relative;
 }
 
+.nav-item.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
 .nav-item>i {
   box-shadow: 0 2px 6px var(--shadow-medium);
   border-radius: 50%;
@@ -751,7 +756,8 @@
   font-size: 16px;
 }
 
-.save-btn {
+.save-btn,
+.auditor-action-btn {
   padding: 6px 12px;
   border: none;
   border-radius: 50px;
@@ -763,7 +769,8 @@
   transition: all 0.2s ease;
 }
 
-.save-btn:hover {
+.save-btn:hover,
+.auditor-action-btn:hover {
   background: #e67e22;
   transform: scale(1.05);
 }
@@ -797,11 +804,13 @@
   padding: 8px 12px;
   text-align: left;
   border-bottom: 1px solid var(--border-light);
+  border-right: 1px solid var(--border-light);
 }
 
 .locator-table td {
   padding: 4px 5px;
   border-bottom: 1px solid var(--border-light);
+  border-right: 1px solid var(--border-light);
   color: var(--primary-text);
 }
 
@@ -1001,11 +1010,7 @@
   border-right: none;
 }
 
-/* POM table column borders */
-.locator-table th,
-.locator-table td {
-  border-right: 1px solid var(--border-light);
-}
+
 
 /* Dropdowns */
 .navdropdown {
@@ -1340,9 +1345,7 @@ select:focus {
   cursor: pointer;
   font-size: 12px;
   color: var(--secondary-text);
-  transition: all 0.2s ease;
-  padding: 2px;
-  border-radius: 4px;
+  transition: color 0.2s ease;
 }
 
 .reset-settings-btn:hover {
@@ -1565,6 +1568,8 @@ select:focus {
   white-space: nowrap;
   overflow-x: auto;
   max-width: 80px;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 
@@ -1657,10 +1662,7 @@ select:focus {
 }
 
 
-.pom-table td {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
+
 
 /* POM Navigation Styles (Capsule & Floating) */
 /* POM Navigation Styles (Compact Capsule) */
@@ -2246,4 +2248,285 @@ input:checked+.toggle-slider:before {
   background: rgba(255, 193, 7, 0.2);
   border-color: rgba(255, 193, 7, 0.6);
   transform: translateY(-1px);
+}
+
+/* Link Auditor Styles */
+#linkAuditorDropdown {
+  width: 280px;
+  max-width: 280px;
+}
+
+.auditor-dropdown-content {
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+
+.auditor-controls {
+  display: flex;
+  gap: 6px;
+}
+
+.auditor-stats {
+  display: flex;
+  gap: 4px;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.auditor-stats .badge-count {
+  margin-left: 0;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-weight: 700;
+  flex: 1;
+  justify-content: center;
+  border: 1px solid transparent;
+}
+
+.auditor-stats .badge-count.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 4px var(--accent-muted);
+}
+
+.auditor-links-container {
+  max-height: 220px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  background: var(--primary-bg);
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.auditor-link-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 11px;
+  transition: background-color 0.2s;
+  min-height: 28px;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+}
+
+.auditor-link-item:last-child {
+  border-bottom: none;
+}
+
+.auditor-link-item:hover {
+  background-color: var(--surface-2);
+}
+
+.auditor-link-status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.auditor-link-status.checking {
+  background: var(--secondary-text);
+  animation: pulse-checking 1.5s infinite ease-in-out;
+}
+
+.auditor-link-status.valid {
+  background: var(--status-green-text);
+  box-shadow: 0 0 3px var(--status-green-text);
+}
+
+.auditor-link-status.redirect {
+  background: var(--warning);
+  box-shadow: 0 0 3px var(--warning);
+}
+
+.auditor-link-status.broken {
+  background: var(--status-red-text);
+  box-shadow: 0 0 3px var(--status-red-text);
+}
+
+.auditor-link-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+}
+
+.auditor-link-text,
+.auditor-link-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.auditor-link-text {
+  font-weight: 600;
+  color: var(--primary-text);
+}
+
+.auditor-link-url {
+  font-size: 9px;
+  color: var(--secondary-text);
+  font-family: monospace;
+}
+
+.auditor-link-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.auditor-link-actions i {
+  cursor: pointer;
+  color: var(--secondary-text);
+  font-size: 11px;
+  padding: 3px;
+  border-radius: 3px;
+  transition: all 0.2s;
+}
+
+.auditor-link-actions i:hover {
+  color: var(--accent);
+  background: var(--surface-hover);
+}
+
+.auditor-link-edit-input {
+  width: 100%;
+  height: 20px;
+  font-size: 10px;
+  background: var(--primary-bg);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--primary-text);
+  padding: 0 4px;
+  box-sizing: border-box;
+  outline: none;
+}
+
+@keyframes pulse-checking {
+
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(0.9);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+/* Link Auditor Progress Bar and Hover Scroll styling */
+.auditor-progress-container {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.auditor-progress-container.hidden {
+  display: none !important;
+}
+
+.auditor-progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 9px;
+  color: var(--secondary-text);
+}
+
+.auditor-progress-bg {
+  width: 100%;
+  height: 4px;
+  background: var(--surface-3);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+#auditorProgressBar {
+  width: 0%;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+
+/* Hover-scroll for long URLs and texts to keep list item height constant */
+.auditor-link-text:hover,
+.auditor-link-url:hover {
+  overflow-x: auto !important;
+  text-overflow: clip !important;
+}
+
+.auditor-link-text::-webkit-scrollbar,
+.auditor-link-url::-webkit-scrollbar {
+  display: none !important;
+}
+
+
+
+/* Collapsible Settings Panel & Header Icons */
+.auditor-settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+}
+
+.auditor-settings-panel.hidden {
+  display: none !important;
+}
+
+.dropdown-header i {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--secondary-text);
+  transition: color 0.2s ease;
+}
+
+.dropdown-header i:hover {
+  color: var(--accent);
+}
+
+.dropdown-header i.active {
+  color: var(--accent);
+}
+/* Minimal About Dropdown Layout */
+.about-container {
+  position: relative;
+  display: inline-flex;
+}
+
+.about-container .navdropdown {
+  min-width: 285px;
+}
+
+details[open] summary {
+  background: var(--surface-2);
+  border-left-color: var(--accent);
 }

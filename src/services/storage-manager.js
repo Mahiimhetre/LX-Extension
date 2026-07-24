@@ -1,4 +1,6 @@
 // Core Storage Manager - Backend Logic (Asynchronous for Manifest V3)
+const sJson = typeof secureJson !== 'undefined' ? secureJson : (typeof require !== 'undefined' ? require('../utils/secure-json.js') : null);
+
 class StorageManager {
     constructor(storagePrefix = LocatorXConfig.STORAGE_KEYS.PREFIX) {
         this.prefix = storagePrefix;
@@ -33,7 +35,7 @@ class StorageManager {
             if (val) {
                 try {
                     // Try to parse as JSON, if it fails, store as raw string (for theme)
-                    migrationData[key] = JSON.parse(val);
+                    migrationData[key] = sJson ? sJson.parse(val) : JSON.parse(val);
                 } catch (e) {
                     migrationData[key] = val;
                 }
@@ -58,7 +60,7 @@ class StorageManager {
             } else {
                 // Fallback to localStorage for non-extension environments (testing)
                 const val = localStorage.getItem(key);
-                try { resolve(JSON.parse(val)); } catch (e) { resolve(val); }
+                try { resolve(sJson ? sJson.parse(val) : JSON.parse(val)); } catch (e) { resolve(val); }
             }
         });
     }
@@ -159,7 +161,11 @@ class StorageManager {
     async getSettings() {
         await this.ensureMigrated();
         const data = await this._getRaw(LocatorXConfig.STORAGE_KEYS.SETTINGS);
-        return (data && typeof data === 'object') ? data : {};
+        const settings = (data && typeof data === 'object') ? data : {};
+        if (!settings.selectedFramework) {
+            settings.selectedFramework = 'playwright';
+        }
+        return settings;
     }
 
     async saveSetting(key, value) {

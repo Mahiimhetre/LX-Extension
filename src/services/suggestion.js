@@ -77,8 +77,6 @@ class SuggestionManager {
                 // Match against text OR the generated XPath
                 if (text.toLowerCase().includes(lowerQuery) || xpath.toLowerCase().includes(lowerQuery)) {
                     add(xpath, 'Text', count);
-                    // Also generate framework wrappers for text
-                    // this._generateFrameworkWrappers(xpath, 'Text', count, lowerQuery, add);
                 }
             });
         }
@@ -119,81 +117,15 @@ class SuggestionManager {
         });
     }
 
-    // Process a category: generate raw + framework wrappers and check query
     _processCategory(source, category, prefix, query, addFn, suffix = '') {
         if (!source) return;
-
         Object.entries(source).forEach(([key, count]) => {
             const rawValue = prefix + key + suffix;
-
-            // 1. Check Raw Match
             if (rawValue.toLowerCase().includes(query)) {
                 addFn(rawValue, category, count);
             }
-            // this._generateFrameworkWrappers(rawValue, category, count, query, addFn);
         });
     }
-
-    /*
-    _generateFrameworkWrappers(rawValue, category, count, query, addFn) {
-        // Selenium
-        let seleniumStr = '';
-        if (rawValue.startsWith('#')) {
-            seleniumStr = `By.id('${rawValue.substring(1)}')`;
-        } else if (rawValue.startsWith('.')) {
-            seleniumStr = `By.className('${rawValue.substring(1)}')`;
-        } else if (rawValue.startsWith('//') || rawValue.startsWith('(')) {
-            seleniumStr = `By.xpath('${rawValue}')`;
-        } else if (category === 'Tag') {
-            seleniumStr = `By.tagName('${rawValue}')`;
-        }
-
-        if (seleniumStr && seleniumStr.toLowerCase().includes(query)) {
-            addFn(seleniumStr, 'Selenium', count);
-        }
-
-        // Cypress
-        const cyGet = `cy.get('${rawValue}')`;
-        if (cyGet.toLowerCase().includes(query)) {
-            addFn(cyGet, 'Cypress', count);
-        }
-
-        if (category === 'Text') {
-            // cy.contains
-            // rawValue is //*[text()='...']
-            // Extract the text content
-            const match = rawValue.match(/text\(\)='(.*)'/);
-            if (match && match[1]) {
-                const cyContains = `cy.contains('${match[1]}')`;
-                if (cyContains.toLowerCase().includes(query)) {
-                    addFn(cyContains, 'Cypress', count);
-                }
-            }
-        }
-
-        // Playwright
-        const pwLocator = `page.locator('${rawValue}')`;
-        if (pwLocator.toLowerCase().includes(query)) {
-            addFn(pwLocator, 'Playwright', count);
-        }
-
-        if (category === 'ID') {
-            const pwId = `page.getByTestId('${rawValue.substring(1)}')`;
-            if (pwId.toLowerCase().includes(query)) {
-                addFn(pwId, 'Playwright', count);
-            }
-        }
-        if (category === 'Text') {
-            const match = rawValue.match(/text\(\)='(.*)'/);
-            if (match && match[1]) {
-                const pwText = `page.getByText('${match[1]}')`;
-                if (pwText.toLowerCase().includes(query)) {
-                    addFn(pwText, 'Playwright', count);
-                }
-            }
-        }
-    }
-    */
 }
 
 // Export for use

@@ -586,8 +586,8 @@ const LocatorX = {
 
             const xpathLoc = locators.find(l => l.type === 'Relative XPath' || l.type === 'OR XPath');
             if (xpathLoc && xpathLoc.locator) {
-                const textMatch = xpathLoc.locator.match(/text\(\)=['"]?([^'")]+)['"]?/) || 
-                                  xpathLoc.locator.match(/normalize-space\(\)=['"]?([^'")]+)['"]?/);
+                const textMatch = xpathLoc.locator.match(/text\(\)=['"]?([^'")]+)['"]?/) ||
+                    xpathLoc.locator.match(/normalize-space\(\)=['"]?([^'")]+)['"]?/);
                 if (textMatch && textMatch[1]) {
                     const cleanText = textMatch[1].replace(/[^a-zA-Z0-9 ]/g, '');
                     if (cleanText.trim().length > 0) {
@@ -1585,7 +1585,7 @@ const LocatorX = {
 
             // Use unified broadcaster for ALL frames
             const allFrameResults = await LocatorX.utils.broadcastToTab('batchEvaluate', { items }, { allFrames: true });
-            
+
             this._finalizeBatchResults(items, allFrameResults);
         },
 
@@ -1711,7 +1711,7 @@ const LocatorX = {
             if (!state) return;
 
             // 1. Search UI
-            const searchInput = document.querySelector('.search-input');
+            const searchInput = document.getElementById('searchInput');
             if (searchInput && state.searchQuery !== undefined) {
                 searchInput.value = state.searchQuery;
             }
@@ -1744,7 +1744,7 @@ const LocatorX = {
         },
 
         resetUI() {
-            const searchInput = document.querySelector('.search-input');
+            const searchInput = document.getElementById('searchInput');
             if (searchInput) searchInput.value = '';
 
             const searchBadge = document.getElementById('searchMatchBadge');
@@ -1757,7 +1757,7 @@ const LocatorX = {
         checkpoint() {
             if (!this.lastTabId) return;
 
-            const searchInput = document.querySelector('.search-input');
+            const searchInput = document.getElementById('searchInput');
             const searchBadge = document.getElementById('searchMatchBadge');
 
             const state = {
@@ -1812,7 +1812,9 @@ const LocatorX = {
             { btn: 'navAbout', dropdown: 'aboutDropdown' },
             { btn: 'navHistory', dropdown: 'customDropdown' },
             { btn: 'navSettings', dropdown: 'settingsDropdown' },
-            { btn: 'userDropdownTrigger', dropdown: 'userDropdown' }
+            { btn: 'userDropdownTrigger', dropdown: 'userDropdown' },
+            { btn: 'navLinkAuditor', dropdown: 'linkAuditorDropdown' },
+            { btn: 'aboutBtn', dropdown: 'aboutHeaderDropdown' }
         ],
 
         init() {
@@ -1827,10 +1829,11 @@ const LocatorX = {
             });
 
             document.addEventListener('click', e => {
-                // Modified to include user-profile in the exception list
+                // Modified to include user-profile and about-container in the exception list
                 if (e.target && e.target.closest &&
                     !e.target.closest('.nav-item') &&
-                    !e.target.closest('.user-profile')) {
+                    !e.target.closest('.user-profile') &&
+                    !e.target.closest('.about-container')) {
                     this.closeAll();
                 }
             });
@@ -1942,6 +1945,8 @@ const LocatorX = {
             this.setupMatchLimitSetting();
             this.setupResetBtn();
             this.setupBlacklistRegexSetting();
+            this.setupIgnoreUrlsSetting();
+            this.setupAuditorIgnoreUrlsSetting();
             this.loadFiltersFromStorage();
             this.saveCurrentFilters('home');
             this.updateTable();
@@ -1978,7 +1983,7 @@ const LocatorX = {
             if (enabledFilters && enabledFilters.length > 0) {
                 // Set checkboxes based on stored filters
                 document.querySelectorAll('.loc-type, .nested-loc-type').forEach(cb => {
-                    cb.checked = enabledFilters.includes(cb.id);
+                    cb.checked = cb.disabled ? false : enabledFilters.includes(cb.id);
                 });
                 this.updateNestedIcon();
             }
@@ -2180,10 +2185,50 @@ const LocatorX = {
                     const lines = e.target.value.split('\n')
                         .map(l => l.trim())
                         .filter(l => l.length > 0);
-                    
+
                     chrome.storage.local.set({ blacklistPatterns: lines });
                     this.syncConfigToTab({ blacklistPatterns: lines });
                     LocatorX.notifications.show('Blacklist patterns updated', 'info');
+                });
+            }
+        },
+
+        setupIgnoreUrlsSetting() {
+            const ignoreUrlsCfg = document.getElementById('extensionIgnoreUrls');
+            if (ignoreUrlsCfg) {
+                chrome.storage.local.get(['extensionIgnoreUrls'], (result) => {
+                    const text = result.extensionIgnoreUrls || '';
+                    ignoreUrlsCfg.value = text;
+                });
+
+                ignoreUrlsCfg.addEventListener('change', (e) => {
+                    const val = e.target.value;
+                    chrome.storage.local.set({ extensionIgnoreUrls: val }, () => {
+                        if (window.SiteSupport) {
+                            SiteSupport.check();
+                        }
+                    });
+                    LocatorX.notifications.show('Extension ignore URLs updated', 'info');
+                });
+            }
+        },
+
+        setupAuditorIgnoreUrlsSetting() {
+            const auditorIgnoreUrlsCfg = document.getElementById('auditorIgnoreUrls');
+            if (auditorIgnoreUrlsCfg) {
+                chrome.storage.local.get(['auditorIgnoreUrls'], (result) => {
+                    const text = result.auditorIgnoreUrls || '';
+                    auditorIgnoreUrlsCfg.value = text;
+                });
+
+                auditorIgnoreUrlsCfg.addEventListener('change', (e) => {
+                    const val = e.target.value;
+                    chrome.storage.local.set({ auditorIgnoreUrls: val }, () => {
+                        if (window.SiteSupport) {
+                            SiteSupport.check();
+                        }
+                    });
+                    LocatorX.notifications.show('Link Auditor ignore URLs updated', 'info');
                 });
             }
         },
@@ -2212,7 +2257,13 @@ const LocatorX = {
                 'smartCorrectEnabled',
                 'maxMatchLimit',
                 'locator-x-theme',
-                'blacklistPatterns'
+                'blacklistPatterns',
+                'auditorExclusions',
+                'auditorTimeout',
+                'auditorConcurrency',
+                'extensionIgnoreUrls',
+                'auditorIgnoreUrls',
+                'auditorSkipHeaderFooter'
             ];
 
             // Clear Chrome Local Storage
@@ -2256,6 +2307,46 @@ const LocatorX = {
             const blacklistRegexCfg = document.getElementById('blacklistRegexCfg');
             if (blacklistRegexCfg) blacklistRegexCfg.value = '';
 
+            const extensionIgnoreUrls = document.getElementById('extensionIgnoreUrls');
+            if (extensionIgnoreUrls) extensionIgnoreUrls.value = '';
+
+            const auditorIgnoreUrls = document.getElementById('auditorIgnoreUrls');
+            if (auditorIgnoreUrls) auditorIgnoreUrls.value = '';
+
+            // Auditor settings inputs
+            const mainAuditorExclusions = document.getElementById('mainAuditorExclusions');
+            if (mainAuditorExclusions) mainAuditorExclusions.value = '';
+
+            const mainAuditorTimeout = document.getElementById('mainAuditorTimeout');
+            if (mainAuditorTimeout) mainAuditorTimeout.value = 5;
+
+            const mainAuditorConcurrency = document.getElementById('mainAuditorConcurrency');
+            if (mainAuditorConcurrency) mainAuditorConcurrency.value = 5;
+
+            const auditorSkipHeaderFooter = document.getElementById('auditorSkipHeaderFooter');
+            if (auditorSkipHeaderFooter) auditorSkipHeaderFooter.checked = false;
+
+            if (LocatorX.linkAuditor) {
+                LocatorX.linkAuditor.exclusions = [];
+                LocatorX.linkAuditor.timeout = 5000;
+                LocatorX.linkAuditor.concurrency = 5;
+                LocatorX.linkAuditor.skipHeaderFooter = false;
+                LocatorX.linkAuditor.links = [];
+                LocatorX.linkAuditor.updateStats();
+                if (LocatorX.linkAuditor.linksList) {
+                    LocatorX.linkAuditor.linksList.innerHTML = `
+                        <div class="empty-state">
+                            <i class="bi-link-45deg" style="font-size: 24px; color: var(--border-dark); margin-bottom: 8px;"></i>
+                            <p style="color: var(--secondary-text); margin: 0;">Click 'Audit Links' to start</p>
+                        </div>
+                    `;
+                }
+                const auditorSettingsPanel = document.getElementById('auditorSettingsPanel');
+                if (auditorSettingsPanel) auditorSettingsPanel.classList.add('hidden');
+                const auditorSettingsToggleBtn = document.getElementById('auditorSettingsToggleBtn');
+                if (auditorSettingsToggleBtn) auditorSettingsToggleBtn.classList.remove('active');
+            }
+
             // Theme (Reset to Light)
             if (LocatorX.theme) {
                 LocatorX.theme.current = 'light';
@@ -2275,6 +2366,13 @@ const LocatorX = {
             if (LocatorX.tabs.current === 'home') this.updateTable();
             else this.updatePOMTable();
 
+            if (typeof planService !== 'undefined') {
+                planService.applyUIGates();
+            }
+
+            if (window.SiteSupport) {
+                SiteSupport.check();
+            }
             LocatorX.notifications.success('Settings reset to defaults');
         },
 
@@ -2299,7 +2397,9 @@ const LocatorX = {
 
             Object.keys(filters).forEach(id => {
                 const checkbox = document.getElementById(id);
-                if (checkbox) checkbox.checked = filters[id];
+                if (checkbox) {
+                    checkbox.checked = checkbox.disabled ? false : !!filters[id];
+                }
             });
 
             this.updateSelectAllState();
@@ -2322,6 +2422,7 @@ const LocatorX = {
             'pLinkTextXpath': 'pLinkTextXpathLocator',
             'attributeXpath': 'attributeXpathLocator',
             'startsWithXpath': 'startsWithXpathLocator',
+            'orXpath': 'orXpathLocator',
             'cssXpath': 'cssXpathLocator',
             'jsPath': 'jsPathLocator', // Assuming ID for completeness if it exists
             'jquery': 'jqueryLocator'   // Assuming ID for completeness if it exists
@@ -2759,6 +2860,21 @@ const LocatorX = {
         formatLocator(locatorValue, type) {
             if (typeof LocatorXPatterns === 'undefined') return locatorValue;
 
+            // Check if code mode is active and has a custom pattern
+            const codeModeInput = document.getElementById('codeModeInput');
+            const codeModeSection = document.getElementById('codeModeSection');
+
+            if (codeModeInput && codeModeSection && !codeModeSection.classList.contains('hidden') && codeModeInput.value.trim()) {
+                const customTemplate = codeModeInput.value.trim();
+                const standardType = type === 'ClassName' ? 'className' : type === 'TagName' ? 'tagName' : type.toLowerCase();
+
+                // Use custom template directly
+                return customTemplate
+                    .replace('{type}', standardType)
+                    .replace('{TYPE}', standardType.toUpperCase())
+                    .replace('{locator}', locatorValue);
+            }
+
             const framework = document.getElementById('frameworkSelect') ? document.getElementById('frameworkSelect').value : 'selenium-java';
             // We assume the first pattern in the framework is the "default" for table display
             // unless we add specific pattern selection to the table rows later.
@@ -2767,7 +2883,7 @@ const LocatorX = {
 
             // Strategy mapping to match Pattern terminology
             const standardType = type === 'ClassName' ? 'className' : type === 'TagName' ? 'tagName' : type.toLowerCase();
-            
+
             return LocatorXPatterns.generate(framework, frameworkPatterns[0].id, standardType, locatorValue);
         },
 
@@ -3073,9 +3189,24 @@ const LocatorX = {
                 nestedIcon.addEventListener('click', e => {
                     e.stopPropagation();
                     const nestedCheckboxes = document.querySelectorAll('.nested-loc-type');
-                    const allChecked = Array.from(nestedCheckboxes).every(cb => cb.checked);
-                    nestedCheckboxes.forEach(cb => cb.checked = !allChecked);
+                    const activeCheckboxes = Array.from(nestedCheckboxes).filter(cb => !cb.disabled);
+                    if (activeCheckboxes.length === 0) return;
+
+                    const allChecked = activeCheckboxes.every(cb => cb.checked);
+                    activeCheckboxes.forEach(cb => cb.checked = !allChecked);
+
+                    const relativeXPath = document.getElementById('relativeXPath');
+                    const anyNested = Array.from(nestedCheckboxes).some(c => c.checked);
+                    if (relativeXPath) relativeXPath.checked = anyNested;
+
                     this.updateNestedIcon();
+                    this.updateSelectAllState();
+
+                    // Save enabled filters to storage
+                    chrome.storage.local.set({ enabledFilters: this.getEnabledFilterIds() });
+
+                    if (LocatorX.tabs.current === 'home') this.updateTable();
+                    else this.updatePOMTable();
                 });
             }
 
@@ -3093,7 +3224,12 @@ const LocatorX = {
             const checkboxes = document.querySelectorAll('.nested-loc-type');
 
             if (icon) {
-                const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+                const activeCheckboxes = Array.from(checkboxes).filter(cb => !cb.disabled);
+                if (activeCheckboxes.length === 0) {
+                    icon.className = 'bi-square nested-select-all';
+                    return;
+                }
+                const allChecked = activeCheckboxes.every(cb => cb.checked);
                 icon.className = allChecked ?
                     'bi-check2-square nested-select-all all-selected' :
                     'bi-square nested-select-all';
@@ -3103,12 +3239,12 @@ const LocatorX = {
 
     codeMode: {
         presets: [
-            '@FindBy({type}="{value}") @CacheLookup private WebElement selectorname;',
-            'driver.findElement(By.{type}("{value}"))',
-            'cy.get("{value}")',
-            'driver.find_element(*(By.{TYPE},"{value}"))',
-            "await page.locator('{type}={value}')",
-            'FindBy({type}="{value}")'
+            '@FindBy({type}="{locator}") @CacheLookup private WebElement selectorname;',
+            'driver.findElement(By.{type}("{locator}"))',
+            'cy.get("{locator}")',
+            'driver.find_element(By.{TYPE}, "{locator}")',
+            "await page.locator('{type}={locator}')",
+            'FindBy({type}="{locator}")'
         ],
 
         init() {
@@ -3116,6 +3252,7 @@ const LocatorX = {
             const section = document.getElementById('codeModeSection');
             const input = document.getElementById('codeModeInput');
             const dropdown = document.getElementById('codeModeDropdown');
+            const clearBtn = section ? section.querySelector('.clear-btn') : null;
 
             if (navBtn && section) {
                 navBtn.addEventListener('click', () => {
@@ -3126,6 +3263,28 @@ const LocatorX = {
                     } else {
                         section.classList.add('hidden');
                         navBtn.classList.remove('active');
+                    }
+                });
+            }
+
+            if (input && clearBtn) {
+                const toggleClearBtn = () => {
+                    if (input.value.length > 0) clearBtn.classList.remove('hidden');
+                    else clearBtn.classList.add('hidden');
+                };
+
+                input.addEventListener('input', toggleClearBtn);
+                toggleClearBtn(); // Initial state
+
+                clearBtn.addEventListener('click', () => {
+                    input.value = '';
+                    toggleClearBtn();
+                    dropdown.style.display = 'none';
+                    dropdown.classList.remove('visible');
+
+                    // Refresh table
+                    if (LocatorX.filters && LocatorX.filters.lastLocators) {
+                        LocatorX.filters.updateTableData(LocatorX.filters.lastLocators);
                     }
                 });
             }
@@ -3145,7 +3304,8 @@ const LocatorX = {
                                 dropdown.style.display = 'none';
                                 dropdown.classList.remove('visible');
 
-                                // Update table immediately
+                                // Update clear button and table
+                                if (clearBtn) clearBtn.classList.remove('hidden');
                                 if (LocatorX.filters && LocatorX.filters.lastLocators) {
                                     LocatorX.filters.updateTableData(LocatorX.filters.lastLocators);
                                 }
@@ -4103,8 +4263,13 @@ const LocatorX = {
     // Saved Locators Management
     savedLocators: {
         async init() {
+            await this.setupSettingsPoliciesHandlers();
             await this.updateDropdown();
             this.setupSavedActions();
+        },
+
+        async setupSettingsPoliciesHandlers() {
+            // Native HTML5 <details name="about-policies"> handles accordion behavior natively.
         },
 
         async updateDropdown() {
@@ -4113,31 +4278,21 @@ const LocatorX = {
 
             const saved = await LocatorX.core.getSavedLocators(LocatorX.activeProjectId);
 
+            let content = '';
             if (saved.length === 0) {
-                dropdown.innerHTML = `
-                    <div class="dropdown-header">
-                        <strong>Saved Locators</strong>
-                    </div>
+                content = `
                     <div class="dropdown-content">
-                        <div class="empty-state">
-                            <i class="bi-bookmark-dash" style="font-size: 24px; color: var(--border-dark); margin-bottom: 8px;"></i>
-                            <p>No saved locators yet</p>
+                        <div class="empty-state" style="padding:8px;">
+                            <i class="bi-bookmark-dash" style="font-size: 16px; color: var(--border-dark); margin-bottom: 4px;"></i>
+                            <p style="color: var(--secondary-text); font-size:11px; margin:0;">No saved locators</p>
                         </div>
                     </div>
                 `;
             } else {
-                let content = `
-                    <div class="dropdown-header">
-                        <strong>Saved Locators</strong> 
-                        <span class="badge-count">${saved.length}</span>
-                    </div>
-                    <div class="dropdown-content">
-                `;
-
+                let items = '';
                 saved.forEach((item, index) => {
                     const typeClass = item.type ? item.type.toLowerCase().replace(/\s+/g, '-') : 'manual';
-                    const icon = (item.id) ? 'bi-trash' : 'bi-trash'; // Keep it simple
-                    content += `
+                    items += `
                         <div class="saved-item" data-index="${index}" data-id="${item.id}">
                             <div class="saved-main">
                                 <div class="saved-info">
@@ -4145,23 +4300,33 @@ const LocatorX = {
                                     <span class="saved-type-badge ${typeClass}">${LocatorX.utils.escapeHtml(item.type)}</span>
                                 </div>
                                 <div class="saved-actions">
-                                    <i class="bi-clipboard header-icon-button saved-copy" title="Copy Locator" style="font-size: 12px; margin: 0 2px;" role="button" tabindex="0"></i>
-                                    <i class="bi-trash header-icon-button saved-delete" title="Delete" style="font-size: 12px; margin: 0 2px;" role="button" tabindex="0"></i>
+                                    <i class="bi-clipboard header-icon-button saved-copy" title="Copy Locator" style="font-size: 12px; margin:0 2px;" role="button" tabindex="0"></i>
+                                    <i class="bi-trash header-icon-button saved-delete" title="Delete" style="font-size: 12px; margin:0 2px;" role="button" tabindex="0"></i>
                                 </div>
                             </div>
                             <div class="saved-locator-code" title="${LocatorX.utils.escapeHtml(item.locator)}">${LocatorX.utils.escapeHtml(item.locator)}</div>
                         </div>
                     `;
                 });
-
-                content += '</div>';
-                dropdown.innerHTML = content;
-
-                // Re-apply feature gates to the new dynamic content
-                if (typeof planService !== 'undefined') { planService.applyUIGates(); }
+                content = `
+                    <div class="dropdown-content">
+                        ${items}
+                    </div>
+                `;
             }
 
-            // Always setup actions after updating content
+            const header = dropdown.querySelector('.dropdown-header');
+            if (header) {
+                dropdown.innerHTML = header.outerHTML + content;
+            } else {
+                dropdown.innerHTML = content;
+            }
+
+            // Re-apply feature gates
+            if (typeof planService !== 'undefined') {
+                planService.applyUIGates();
+            }
+
             this.setupSavedActions();
         },
 
@@ -4217,9 +4382,9 @@ const LocatorX = {
         },
 
         setupSaveButton() {
-            const saveBtn = document.querySelector('.save-btn');
-            const saveInput = document.querySelector('.save-input');
-            const searchInput = document.querySelector('.search-input');
+            const saveBtn = document.getElementById('saveLocatorBtn');
+            const saveInput = document.getElementById('saveLocatorInput');
+            const searchInput = document.getElementById('searchInput');
 
             if (saveBtn && saveInput && searchInput) {
                 saveBtn.addEventListener('click', async () => {
@@ -4449,7 +4614,7 @@ const LocatorX = {
                         // Single click - highlight in search (Table Cells only - heuristic)
                         if (editableEl.dataset.target === 'table-cell') {
                             const locator = editableEl.textContent;
-                            const searchInput = document.querySelector('.search-input');
+                            const searchInput = document.getElementById('searchInput');
                             if (searchInput) {
                                 searchInput.value = locator;
                                 searchInput.focus();
@@ -4547,12 +4712,650 @@ const LocatorX = {
     }
 };
 
+LocatorX.linkAuditor = {
+    links: [],
+    filteredLinks: [],
+    isScanning: false,
+    activeFilter: 'all',
+    concurrency: 5,
+    timeout: 5000,
+    exclusions: [],
+    skipHeaderFooter: false,
+
+    async init() {
+        // Load elements
+        this.exclusionsInput = document.getElementById('mainAuditorExclusions');
+        this.timeoutInput = document.getElementById('mainAuditorTimeout');
+        this.concurrencyInput = document.getElementById('mainAuditorConcurrency');
+        this.skipHeaderFooterInput = document.getElementById('auditorSkipHeaderFooter');
+
+        this.startBtn = document.getElementById('auditorStartBtn');
+        this.stopBtn = document.getElementById('auditorStopBtn');
+        this.linksList = document.getElementById('auditorLinksList');
+        this.exportBtn = document.getElementById('auditorExportBtn');
+
+        this.statAll = document.getElementById('statAll');
+        this.statValid = document.getElementById('statValid');
+        this.statRedirect = document.getElementById('statRedirect');
+        this.statBroken = document.getElementById('statBroken');
+
+        if (!this.startBtn) return;
+
+        // Load saved settings
+        chrome.storage.local.get(['auditorExclusions', 'auditorTimeout', 'auditorConcurrency', 'auditorSkipHeaderFooter'], (res) => {
+            const exclusionsText = res.auditorExclusions || '';
+            if (this.exclusionsInput) this.exclusionsInput.value = exclusionsText;
+            this.exclusions = exclusionsText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+            const timeoutVal = res.auditorTimeout || 5;
+            if (this.timeoutInput) this.timeoutInput.value = timeoutVal;
+            this.timeout = timeoutVal * 1000;
+
+            const concurrencyVal = res.auditorConcurrency || 5;
+            if (this.concurrencyInput) this.concurrencyInput.value = concurrencyVal;
+            this.concurrency = concurrencyVal;
+
+            const skipVal = !!res.auditorSkipHeaderFooter;
+            if (this.skipHeaderFooterInput) this.skipHeaderFooterInput.checked = skipVal;
+            this.skipHeaderFooter = skipVal;
+        });
+
+        const syncTimeout = (val) => {
+            const num = Math.max(1, Math.min(30, parseInt(val) || 5));
+            if (this.timeoutInput) this.timeoutInput.value = num;
+            this.timeout = num * 1000;
+            chrome.storage.local.set({ auditorTimeout: num });
+        };
+
+        const syncConcurrency = (val) => {
+            const num = Math.max(1, Math.min(20, parseInt(val) || 5));
+            if (this.concurrencyInput) this.concurrencyInput.value = num;
+            this.concurrency = num;
+            chrome.storage.local.set({ auditorConcurrency: num });
+        };
+
+        if (this.timeoutInput) this.timeoutInput.addEventListener('change', (e) => syncTimeout(e.target.value));
+        if (this.concurrencyInput) this.concurrencyInput.addEventListener('change', (e) => syncConcurrency(e.target.value));
+
+        if (this.exclusionsInput) {
+            this.exclusionsInput.addEventListener('change', (e) => {
+                const txt = e.target.value;
+                this.exclusions = txt.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                chrome.storage.local.set({ auditorExclusions: txt });
+            });
+        }
+
+        if (this.skipHeaderFooterInput) {
+            this.skipHeaderFooterInput.addEventListener('change', (e) => {
+                const checked = e.target.checked;
+                this.skipHeaderFooter = checked;
+                chrome.storage.local.set({ auditorSkipHeaderFooter: checked });
+            });
+        }
+
+        // Bind control buttons
+        this.startBtn.addEventListener('click', () => this.startScan());
+        this.stopBtn.addEventListener('click', () => this.stopScan());
+
+        // Stats filters
+        this.statAll.addEventListener('click', () => this.setFilter('all'));
+        this.statValid.addEventListener('click', () => this.setFilter('valid'));
+        this.statRedirect.addEventListener('click', () => this.setFilter('redirect'));
+        this.statBroken.addEventListener('click', () => this.setFilter('broken'));
+
+        // Export results
+        if (this.exportBtn) {
+            this.exportBtn.addEventListener('click', () => this.exportResults());
+        }
+
+        // Bind settings toggle button
+        const settingsToggle = document.getElementById('auditorSettingsToggleBtn');
+        const settingsPanel = document.getElementById('auditorSettingsPanel');
+        if (settingsToggle && settingsPanel) {
+            settingsToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isHidden = settingsPanel.classList.contains('hidden');
+                if (isHidden) {
+                    settingsPanel.classList.remove('hidden');
+                    settingsToggle.classList.add('active');
+                } else {
+                    settingsPanel.classList.add('hidden');
+                    settingsToggle.classList.remove('active');
+                }
+            });
+        }
+    },
+
+    setFilter(filterType) {
+        this.activeFilter = filterType;
+        [this.statAll, this.statValid, this.statRedirect, this.statBroken].forEach(el => {
+            if (el) el.classList.remove('active');
+        });
+
+        if (filterType === 'all' && this.statAll) this.statAll.classList.add('active');
+        else if (filterType === 'valid' && this.statValid) this.statValid.classList.add('active');
+        else if (filterType === 'redirect' && this.statRedirect) this.statRedirect.classList.add('active');
+        else if (filterType === 'broken' && this.statBroken) this.statBroken.classList.add('active');
+
+        this.renderList();
+    },
+
+    async startScan() {
+        if (this.isScanning) return;
+
+        // Clear prior states
+        this.links = [];
+        this.isScanning = true;
+        this.startBtn.classList.add('hidden');
+        this.stopBtn.classList.remove('hidden');
+
+        this.updateStats();
+        this.linksList.innerHTML = `
+            <div class="empty-state">
+                <span class="ms-spinner" style="margin-bottom: 8px;"></span>
+                <p style="color: var(--secondary-text); margin: 0;">Extracting page links...</p>
+            </div>
+        `;
+
+        try {
+            // Get active tab URL to resolve relative paths
+            const tabs = await new Promise(resolve => chrome.tabs.query({ active: true, currentWindow: true }, resolve));
+            const activeTab = tabs[0];
+            if (!activeTab || !activeTab.id) {
+                throw new Error('No active browser tab found.');
+            }
+            const pageUrl = activeTab.url;
+
+            const userPlan = (typeof planService !== 'undefined') ? planService.currentPlan : 'free';
+            const isAllowed = (typeof LocatorXPlans !== 'undefined') ? 
+                LocatorXPlans.FEATURES[userPlan]?.includes('ui.checkLinks.skipHeaderFooter') || LocatorXPlans.FEATURES[userPlan] === 'ALL' : false;
+            const skipHeaderFooter = !!(isAllowed && this.skipHeaderFooter);
+
+            chrome.tabs.sendMessage(activeTab.id, { action: 'extractPageLinks', skipHeaderFooter }, (response) => {
+                if (chrome.runtime.lastError || !response || !response.success) {
+                    this.stopScan();
+                    LocatorX.notifications.error('Could not communicate with tab. Reload the page and try again.');
+                    return;
+                }
+
+                let rawLinks = response.links || [];
+                if (rawLinks.length === 0) {
+                    this.stopScan();
+                    this.linksList.innerHTML = `
+                        <div class="empty-state">
+                            <i class="bi-exclamation-triangle" style="font-size: 24px; color: var(--warning); margin-bottom: 8px;"></i>
+                            <p style="color: var(--secondary-text); margin: 0;">No links found on this page</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Gate features & limits: Free allows up to 50 links
+                const userPlan = (typeof planService !== 'undefined') ? planService.currentPlan : 'free';
+                const maxAllowed = (typeof LocatorXPlans !== 'undefined') ?
+                    LocatorXPlans.LIMITS[userPlan].MAX_AUDIT_LINKS || 50 : 50;
+
+                if (rawLinks.length > maxAllowed && maxAllowed !== Infinity) {
+                    rawLinks = rawLinks.slice(0, maxAllowed);
+                    LocatorX.notifications.warn(`Free plan limit: Auditing first 50 links. Upgrade to Pro for unlimited.`);
+                }
+
+                // Format and structure link status items
+                this.links = rawLinks.map(link => {
+                    let absoluteUrl = link.href;
+                    let isExcluded = false;
+
+                    // Resolve relative paths using Tab URL context
+                    if (link.href && !/^[a-z]+:/i.test(link.href)) {
+                        try {
+                            absoluteUrl = new URL(link.href, pageUrl).href;
+                        } catch (e) {
+                            absoluteUrl = link.href;
+                        }
+                    }
+
+                    // Check regex exclusions
+                    if (absoluteUrl) {
+                        for (const pattern of this.exclusions) {
+                            try {
+                                const regex = new RegExp(pattern, 'i');
+                                if (regex.test(absoluteUrl)) {
+                                    isExcluded = true;
+                                    break;
+                                }
+                            } catch (e) {
+                                // Ignore invalid regex in user exclusions
+                            }
+                        }
+                    }
+
+                    return {
+                        id: link.id,
+                        text: link.text || '(No text)',
+                        href: link.href || '',
+                        absoluteUrl: absoluteUrl,
+                        bestLocator: LocatorX.pom.getBestLocator(link.locators)?.value || 'css=a',
+                        status: isExcluded ? 'valid' : 'checking',
+                        code: isExcluded ? 'EXCLUDED' : '...',
+                        statusText: isExcluded ? 'Excluded' : 'Checking...',
+                        isExcluded: isExcluded,
+                        isEditing: false
+                    };
+                });
+
+                this.renderList();
+                this.updateStats();
+
+                // Start Concurrent Auditing Queue
+                this.runVerificationQueue();
+            });
+        } catch (err) {
+            console.error(err);
+            this.stopScan();
+            LocatorX.notifications.error('Failed to initiate scan.');
+        }
+    },
+
+    stopScan() {
+        this.isScanning = false;
+        if (this.startBtn) this.startBtn.classList.remove('hidden');
+        if (this.stopBtn) this.stopBtn.classList.add('hidden');
+
+        // Mark remaining checking items as broken/cancelled
+        this.links.forEach(l => {
+            if (l.status === 'checking') {
+                l.status = 'broken';
+                l.code = 'STOP';
+                l.statusText = 'Cancelled';
+            }
+        });
+        this.renderList();
+        this.updateStats();
+    },
+
+    async runVerificationQueue() {
+        const queue = [...this.links].filter(l => l.status === 'checking');
+        if (queue.length === 0) {
+            this.stopScan();
+            return;
+        }
+
+        let index = 0;
+        const activeChecks = [];
+
+        const processNext = async () => {
+            if (!this.isScanning) return;
+            if (index >= queue.length) return;
+
+            const item = queue[index++];
+            const checkPromise = this.verifyItem(item);
+            activeChecks.push(checkPromise);
+
+            // Re-render item in list as it updates
+            checkPromise.finally(() => {
+                const idx = activeChecks.indexOf(checkPromise);
+                if (idx > -1) activeChecks.splice(idx, 1);
+                this.updateStats();
+                this.updateListItemUI(item);
+
+                // Trigger next in queue
+                processNext();
+            });
+        };
+
+        // Start up to concurrency limit
+        const limit = Math.min(this.concurrency, queue.length);
+        for (let i = 0; i < limit; i++) {
+            processNext();
+        }
+
+        // Periodically check if all done
+        const checkCompletion = setInterval(() => {
+            if (!this.isScanning || (activeChecks.length === 0 && index >= queue.length)) {
+                clearInterval(checkCompletion);
+                this.stopScan();
+                LocatorX.notifications.success('Link audit completed!');
+            }
+        }, 500);
+    },
+
+    async verifyItem(item) {
+        // Check for relative javascript URLs or tel/mail etc.
+        if (!item.href || item.href.trim() === '#' || item.href.trim() === '') {
+            item.status = 'broken';
+            item.code = 'EMPTY';
+            item.statusText = 'Empty/No URL';
+            return;
+        }
+
+        if (item.href.startsWith('javascript:')) {
+            item.status = 'valid';
+            item.code = 'JS';
+            item.statusText = 'Javascript Trigger';
+            return;
+        }
+
+        if (item.href.startsWith('mailto:') || item.href.startsWith('tel:') || item.href.startsWith('sms:')) {
+            item.status = 'valid';
+            item.code = 'URI';
+            item.statusText = 'System Protocol';
+            return;
+        }
+
+        return new Promise((resolve) => {
+            chrome.runtime.sendMessage({
+                action: 'checkUrlStatus',
+                url: item.absoluteUrl,
+                timeout: this.timeout
+            }, (response) => {
+                if (chrome.runtime.lastError || !response || !response.success) {
+                    item.status = 'broken';
+                    item.code = 'ERR';
+                    item.statusText = response?.error || 'Network Error';
+                } else {
+                    const status = response.status;
+                    item.code = status;
+                    item.statusText = response.statusText || '';
+
+                    if (status >= 400 || status === 0) {
+                        item.status = 'broken';
+                    } else if (status >= 300 && status < 400) {
+                        item.status = 'redirect';
+                    } else {
+                        item.status = 'valid';
+                    }
+                }
+                resolve();
+            });
+        });
+    },
+
+    updateStats() {
+        let total = this.links.length;
+        let valid = this.links.filter(l => l.status === 'valid').length;
+        let redirect = this.links.filter(l => l.status === 'redirect').length;
+        let broken = this.links.filter(l => l.status === 'broken').length;
+
+        const allCount = document.getElementById('statAllCount');
+        const validCount = document.getElementById('statValidCount');
+        const redirectCount = document.getElementById('statRedirectCount');
+        const brokenCount = document.getElementById('statBrokenCount');
+
+        if (allCount) allCount.textContent = total;
+        if (validCount) validCount.textContent = valid;
+        if (redirectCount) redirectCount.textContent = redirect;
+        if (brokenCount) brokenCount.textContent = broken;
+
+        this.updateProgressBar();
+    },
+
+    updateProgressBar() {
+        const container = document.getElementById('auditorProgressContainer');
+        const progressBar = document.getElementById('auditorProgressBar');
+        const progressPercent = document.getElementById('auditorProgressPercent');
+        const progressLabel = document.getElementById('auditorProgressLabel');
+
+        if (!container || !progressBar || !progressPercent) return;
+
+        if (!this.isScanning) {
+            container.classList.add('hidden');
+            return;
+        }
+
+        container.classList.remove('hidden');
+        const total = this.links.length;
+        const completed = this.links.filter(l => l.status !== 'checking').length;
+        const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+        progressBar.style.width = `${percent}%`;
+        progressPercent.textContent = `${percent}%`;
+
+        if (progressLabel) {
+            progressLabel.textContent = `Auditing: ${completed} / ${total} links`;
+        }
+    },
+
+    renderList() {
+        if (!this.linksList) return;
+        this.linksList.innerHTML = '';
+
+        // Filter elements
+        let displayList = this.links;
+        if (this.activeFilter !== 'all') {
+            displayList = this.links.filter(l => l.status === this.activeFilter);
+        }
+
+        if (displayList.length === 0) {
+            this.linksList.innerHTML = `
+                <div class="empty-state">
+                    <i class="bi-search" style="font-size: 20px; color: var(--border-dark); margin-bottom: 6px;"></i>
+                    <p style="color: var(--secondary-text); margin: 0; font-size:10px;">No links matching this filter</p>
+                </div>
+            `;
+            return;
+        }
+
+        displayList.forEach(item => {
+            const itemEl = document.createElement('div');
+            itemEl.className = 'auditor-link-item';
+            itemEl.id = `auditor-${item.id}`;
+            itemEl.innerHTML = this.getLinkItemHTML(item);
+
+            this.bindLinkItemEvents(itemEl, item);
+            this.linksList.appendChild(itemEl);
+        });
+    },
+
+    getLinkItemHTML(item) {
+        const statusClass = item.status;
+        const codeText = item.code || '...';
+
+        if (item.isEditing) {
+            return `
+                <div class="auditor-link-info" style="flex-direction:row; gap:4px; align-items:center; width:100%;">
+                    <input type="text" class="auditor-link-edit-input" value="${LocatorX.utils.escapeHtml(item.href)}" />
+                    <div class="auditor-link-actions" style="margin-left:auto;">
+                        <i class="bi-check2 save-edit" title="Save DOM Href" role="button" tabindex="0"></i>
+                        <i class="bi-x cancel-edit" title="Cancel" role="button" tabindex="0"></i>
+                    </div>
+                </div>
+            `;
+        }
+
+        return `
+            <span class="auditor-link-status ${statusClass}" title="${LocatorX.utils.escapeHtml(item.statusText || '')}"></span>
+            <div class="auditor-link-info">
+                <span class="auditor-link-text" title="${LocatorX.utils.escapeHtml(item.text)}">${LocatorX.utils.escapeHtml(item.text)}</span>
+                <span class="auditor-link-url" title="${LocatorX.utils.escapeHtml(item.href)}">[${codeText}] ${LocatorX.utils.escapeHtml(item.href)}</span>
+            </div>
+            <div class="auditor-link-actions">
+                <i class="bi-crosshair locate-link" title="Locate on page" role="button" tabindex="0"></i>
+                <i class="bi-clipboard copy-locator" title="Copy best locator" role="button" tabindex="0" data-locator="${LocatorX.utils.escapeHtml(item.bestLocator)}"></i>
+                <i class="bi-pencil edit-href" title="Quick edit DOM href" role="button" tabindex="0"></i>
+            </div>
+        `;
+    },
+
+    updateListItemUI(item) {
+        const itemEl = document.getElementById(`auditor-${item.id}`);
+        if (itemEl && !item.isEditing) {
+            // Update status light and code in place
+            const statusDot = itemEl.querySelector('.auditor-link-status');
+            if (statusDot) {
+                statusDot.className = `auditor-link-status ${item.status}`;
+                statusDot.title = item.statusText || '';
+            }
+
+            const urlSpan = itemEl.querySelector('.auditor-link-url');
+            if (urlSpan) {
+                urlSpan.textContent = `[${item.code}] ${item.href}`;
+                urlSpan.title = item.href;
+            }
+        }
+    },
+
+    bindLinkItemEvents(itemEl, item) {
+        if (item.isEditing) {
+            const input = itemEl.querySelector('.auditor-link-edit-input');
+            const saveBtn = itemEl.querySelector('.save-edit');
+            const cancelBtn = itemEl.querySelector('.cancel-edit');
+
+            const finishEdit = async (save) => {
+                if (save) {
+                    const newHref = input.value.trim();
+                    if (newHref !== item.href) {
+                        // Update Href in webpage DOM
+                        const tabs = await new Promise(resolve => chrome.tabs.query({ active: true, currentWindow: true }, resolve));
+                        const activeTab = tabs[0];
+                        if (activeTab && activeTab.id) {
+                            chrome.tabs.sendMessage(activeTab.id, {
+                                action: 'updateLinkHref',
+                                id: item.id,
+                                href: newHref
+                            }, (res) => {
+                                if (chrome.runtime.lastError || !res || !res.success) {
+                                    LocatorX.notifications.error('Could not modify DOM element.');
+                                } else {
+                                    item.href = newHref;
+                                    // Re-evaluate absoluteUrl
+                                    try {
+                                        item.absoluteUrl = new URL(newHref, activeTab.url).href;
+                                    } catch (e) {
+                                        item.absoluteUrl = newHref;
+                                    }
+
+                                    // Trigger single check
+                                    item.status = 'checking';
+                                    item.code = '...';
+                                    item.statusText = 'Checking...';
+                                    this.updateListItemUI(item);
+                                    this.verifyItem(item).then(() => {
+                                        this.updateListItemUI(item);
+                                        this.updateStats();
+                                        LocatorX.notifications.success('DOM repaired & link re-verified!');
+                                    });
+                                }
+                            });
+                        }
+                    }
+                }
+                item.isEditing = false;
+                this.renderList();
+            };
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') finishEdit(true);
+                if (e.key === 'Escape') finishEdit(false);
+            });
+
+            saveBtn.addEventListener('click', () => finishEdit(true));
+            cancelBtn.addEventListener('click', () => finishEdit(false));
+
+            setTimeout(() => input.focus(), 50);
+            return;
+        }
+
+        const locateBtn = itemEl.querySelector('.locate-link');
+        const copyBtn = itemEl.querySelector('.copy-locator');
+        const editBtn = itemEl.querySelector('.edit-href');
+
+        locateBtn.addEventListener('click', async () => {
+            const tabs = await new Promise(resolve => chrome.tabs.query({ active: true, currentWindow: true }, resolve));
+            const activeTab = tabs[0];
+            if (activeTab && activeTab.id) {
+                chrome.tabs.sendMessage(activeTab.id, {
+                    action: 'highlightLinkElement',
+                    id: item.id
+                });
+            }
+        });
+
+        copyBtn.addEventListener('click', async () => {
+            const ok = await LocatorX.utils.copyToClipboard(item.bestLocator);
+            if (ok) LocatorX.notifications.success('Locator copied!');
+            else LocatorX.notifications.error('Failed to copy');
+        });
+
+        editBtn.addEventListener('click', () => {
+            // Check quick edit feature plan allowance (Pro)
+            const userPlan = (typeof planService !== 'undefined') ? planService.currentPlan : 'free';
+            const isAllowed = (typeof LocatorXPlans !== 'undefined') ?
+                LocatorXPlans.FEATURES[userPlan].includes('ui.quickEdit') || LocatorXPlans.FEATURES[userPlan] === 'ALL' : false;
+
+            if (!isAllowed) {
+                LocatorX.notifications.info(`Quick edit DOM repair requires a Pro plan. <a href="https://locator-x.com/pricing" target="_blank" style="color: #60a5fa; text-decoration: underline;">Upgrade Now</a>`);
+                return;
+            }
+
+            item.isEditing = true;
+            this.renderList();
+        });
+    },
+
+    exportResults() {
+        // Check plan gating (Pro)
+        const userPlan = (typeof planService !== 'undefined') ? planService.currentPlan : 'free';
+        const isAllowed = (typeof LocatorXPlans !== 'undefined') ?
+            LocatorXPlans.FEATURES[userPlan].includes('ui.checkLinks.export') || LocatorXPlans.FEATURES[userPlan] === 'ALL' : false;
+
+        if (!isAllowed) {
+            LocatorX.notifications.info(`CSV export requires a Pro plan. <a href="https://locator-x.com/pricing" target="_blank" style="color: #60a5fa; text-decoration: underline;">Upgrade Now</a>`);
+            return;
+        }
+
+        if (this.links.length === 0) {
+            LocatorX.notifications.warn('No audited links to export.');
+            return;
+        }
+
+        // Build CSV
+        let csvContent = 'URL,Text,Status Code,Status Category,Best Locator\n';
+        this.links.forEach(l => {
+            const escapeCsv = (str) => {
+                if (!str) return '""';
+                return `"${str.replace(/"/g, '""')}"`;
+            };
+            csvContent += `${escapeCsv(l.href)},${escapeCsv(l.text)},${escapeCsv(String(l.code))},${escapeCsv(l.status)},${escapeCsv(l.bestLocator)}\n`;
+        });
+
+        // Extract Domain for filename
+        let domain = 'webpage';
+        if (this.links[0] && this.links[0].absoluteUrl) {
+            try {
+                domain = new URL(this.links[0].absoluteUrl).hostname;
+            } catch (e) { }
+        }
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const filename = `link_audit_${domain}_${timestamp}.csv`;
+
+        const element = document.createElement('a');
+        element.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent));
+        element.setAttribute('download', filename);
+        element.style.display = 'none';
+        document.body.appendChild(element);
+        element.click();
+        document.body.removeChild(element);
+
+        LocatorX.notifications.success('CSV exported successfully');
+    }
+};
+
+// Export LocatorX globally
+if (typeof window !== 'undefined') {
+    window.LocatorX = LocatorX;
+}
+if (typeof global !== 'undefined') {
+    global.LocatorX = LocatorX;
+}
+
 // Initialize the application with error handling
 LocatorX.init().then(() => {
     // Initialize Axes after main init
     if (LocatorX.axes) LocatorX.axes.init();
     if (LocatorX.codeMode) LocatorX.codeMode.init();
     if (LocatorX.utils.setupInputGroups) LocatorX.utils.setupInputGroups();
+    if (LocatorX.linkAuditor) LocatorX.linkAuditor.init();
 }).catch(err => {
     console.error('Failed to initialize Locator-X:', err);
 });

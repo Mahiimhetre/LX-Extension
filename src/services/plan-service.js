@@ -124,8 +124,13 @@ class PlanService {
         el.style.cursor = 'not-allowed';
 
         // Disable interactive elements
-        if (['BUTTON', 'INPUT', 'SELECT'].includes(el.tagName)) {
+        if (['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName)) {
             el.disabled = true;
+            if (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'number' || el.type === 'password')) {
+                el.readOnly = true;
+            } else if (el.tagName === 'TEXTAREA') {
+                el.readOnly = true;
+            }
             if ((el.type === 'checkbox' || el.type === 'radio') && el.checked) {
                 el.checked = false;
                 // Trigger change event so listeners (like filter manager) know it's off
@@ -158,16 +163,41 @@ class PlanService {
             }
         }
 
-        // Handle clicks - Redirect to upgrade
-        if (!el.hasUpgradeListener) {
-            el.addEventListener('click', (e) => {
-                if (el.getAttribute('data-locked') === 'true') {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this._showUpgradePrompt(featureId);
-                }
-            }, true);
-            el.hasUpgradeListener = true;
+        // Handle clicks and key activations - Redirect to upgrade
+        const attachUpgradePrompt = (targetEl) => {
+            if (!targetEl.hasUpgradeListener) {
+                targetEl.addEventListener('click', (e) => {
+                    if (el.getAttribute('data-locked') === 'true') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this._showUpgradePrompt(featureId);
+                    }
+                }, true);
+
+                targetEl.addEventListener('keydown', (e) => {
+                    if (el.getAttribute('data-locked') === 'true') {
+                        if ([' ', 'Enter'].includes(e.key)) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            this._showUpgradePrompt(featureId);
+                        }
+                    }
+                }, true);
+
+                targetEl.hasUpgradeListener = true;
+            }
+        };
+
+        attachUpgradePrompt(el);
+
+        // Bubble up listeners to parent containers (like labels and toggle switch wrappers)
+        // since disabled inputs do not receive or fire mouse events natively.
+        let parent = el.parentElement;
+        while (parent && parent !== document.body) {
+            if (parent.tagName === 'LABEL' || parent.classList.contains('toggle-switch') || parent.classList.contains('setting-option') || parent.classList.contains('setting-group')) {
+                attachUpgradePrompt(parent);
+            }
+            parent = parent.parentElement;
         }
     }
 
@@ -180,8 +210,9 @@ class PlanService {
         el.style.opacity = '1';
         el.style.cursor = '';
 
-        if (['BUTTON', 'INPUT', 'SELECT'].includes(el.tagName)) {
+        if (['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName)) {
             el.disabled = false;
+            el.readOnly = false;
         }
 
         const badge = el.querySelector('.upgrade-badge');
@@ -196,11 +227,11 @@ class PlanService {
 
         if (typeof window !== 'undefined' && window.LocatorX && window.LocatorX.notifications) {
             window.LocatorX.notifications.info(
-                `Unlocking ${featureId} requires a Pro plan. <a href="${upgradeUrl}" target="_blank" style="color: #60a5fa; text-decoration: underline;">Upgrade Now</a>`,
+                `Unlock PRO features to access this setting. <a href="${upgradeUrl}" target="_blank" style="color: #60a5fa; text-decoration: underline;">Upgrade Now</a>`,
                 'Feature Locked'
             );
         } else {
-            console.log(`Feature ${featureId} is locked. Visit ${upgradeUrl} to upgrade.`);
+            console.log(`Unlock PRO features to access this setting. Visit ${upgradeUrl} to upgrade.`);
         }
     }
 }

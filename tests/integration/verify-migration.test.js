@@ -1,8 +1,5 @@
 /**
  * Automated Verification for LocatorX Storage Migration (Manifest V3)
- * This script validates that:
- * 1. chrome.storage.local is the single source of truth.
- * 2. Data migration from Legacy to V3 works correctly.
  */
 
 const assert = (condition, message) => {
@@ -10,7 +7,7 @@ const assert = (condition, message) => {
     console.log(`PASSED: ${message}`);
 };
 
-async function runMigrationTests() {
+async function runTests() {
     console.log('--- Starting LocatorX Migration Verification ---');
 
     // 1. Mock chrome.storage.local if running in a non-extension environment
@@ -60,8 +57,7 @@ async function runMigrationTests() {
     localStorage.setItem('locator-x-theme', 'dark');
 
     // 3. Import and Run StorageManager migration
-    // (Assuming we are in a test runner that handles imports, or using required modules)
-    const StorageManager = require('../services/storage-manager');
+    const StorageManager = require('../../src/services/storage-manager');
     const manager = new StorageManager();
 
     console.log('Running ensureMigrated()...');
@@ -76,12 +72,7 @@ async function runMigrationTests() {
     assert(migratedData[pomKey][0].id === 'legacy_1', 'POM data integrity maintained');
     assert(migratedData[themeKey] === 'dark', 'Theme preference migrated');
 
-    // 5. Verify localStorage Cleanup (Decoupling)
-    // The StorageManager should NOT necessarily delete legacy data yet (for safety), 
-    // but the code should no longer READ from it.
-    // However, our verification should ensure that LocatorXCore uses the NEW store.
-
-    const LocatorXCore = require('../services/locator-x-core');
+    const LocatorXCore = require('../../src/services/locator-x-core');
     const core = new LocatorXCore();
     await core.initialize();
 
@@ -112,7 +103,6 @@ if (typeof window === 'undefined') {
     global.document = { evaluate: () => ({ snapshotLength: 0 }) };
     global.Node = { ELEMENT_NODE: 1 };
 
-    // Define extension globals for node test execution
     global.LocatorXConfig = {
         STORAGE_KEYS: {
             PREFIX: 'lx_',
@@ -131,11 +121,15 @@ if (typeof window === 'undefined') {
         createDefaultFilterState() { return {}; }
         applyFrameworkRules() { return {}; }
     };
-    global.StorageManager = require('../services/storage-manager');
+    global.StorageManager = require('../../src/services/storage-manager');
     global.planService = { getLimit() { return 50; } };
 }
 
-runMigrationTests().catch(err => {
-    console.error('Migration Test Failed:', err);
-    process.exit(1);
-});
+if (require.main === module) {
+    runTests().catch(err => {
+        console.error('Migration Test Failed:', err);
+        process.exit(1);
+    });
+}
+
+module.exports = { runTests };

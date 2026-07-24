@@ -1,116 +1,110 @@
 const assert = require('assert');
-const FilterManager = require('../services/filter-manager.js');
+const FilterManager = require('../../src/services/filter-manager.js');
 
-let testsPassed = 0;
-let testsFailed = 0;
+const suites = [];
+const test = (name, fn) => suites.push({ name, fn });
 
-function runTest(name, testFn) {
-    try {
-        const fm = new FilterManager(); // Fresh instance for each test
-        testFn(fm);
-        console.log(`✅ PASS: ${name}`);
-        testsPassed++;
-    } catch (error) {
-        console.error(`❌ FAIL: ${name}`);
-        console.error(`   ${error.message}`);
-        testsFailed++;
-    }
-}
-
-console.log("Starting FilterManager Tests...\n");
-
-// 1. Test createDefaultFilterState
-runTest("createDefaultFilterState creates 10 default filters", (fm) => {
+test("createDefaultFilterState creates 10 default filters", () => {
+    const fm = new FilterManager();
     const defaultState = fm.createDefaultFilterState();
     assert.strictEqual(Object.keys(defaultState).length, 10);
 });
 
-runTest("createDefaultFilterState sets id to enabled", (fm) => {
+test("createDefaultFilterState sets id to enabled", () => {
+    const fm = new FilterManager();
     const defaultState = fm.createDefaultFilterState();
     assert.strictEqual(defaultState.id.enabled, true);
     assert.strictEqual(defaultState.id.disabled, false);
 });
 
-runTest("createDefaultFilterState includes absoluteXpath", (fm) => {
+test("createDefaultFilterState includes absoluteXpath", () => {
+    const fm = new FilterManager();
     const defaultState = fm.createDefaultFilterState();
     assert.strictEqual(defaultState.absoluteXpath.enabled, true);
 });
 
-// 2. Test applyFrameworkRules
-
-runTest("applyFrameworkRules (cypress) disables linkText", (fm) => {
+test("applyFrameworkRules (cypress) disables linkText", () => {
+    const fm = new FilterManager();
     const baseState = fm.createDefaultFilterState();
     const cypressState = fm.applyFrameworkRules('cypress', baseState);
     assert.strictEqual(cypressState.linkText.disabled, true);
     assert.strictEqual(cypressState.linkText.enabled, false);
 });
 
-runTest("applyFrameworkRules (cypress) leaves id enabled", (fm) => {
+test("applyFrameworkRules (cypress) leaves id enabled", () => {
+    const fm = new FilterManager();
     const baseState = fm.createDefaultFilterState();
     const cypressState = fm.applyFrameworkRules('cypress', baseState);
     assert.strictEqual(cypressState.id.enabled, true);
 });
 
-runTest("applyFrameworkRules (playwright) sets css.disabled to false", (fm) => {
+test("applyFrameworkRules (playwright) sets css.disabled to false", () => {
+    const fm = new FilterManager();
     const baseState = fm.createDefaultFilterState();
     const playwrightState = fm.applyFrameworkRules('playwright', baseState);
     assert.strictEqual(playwrightState.css.disabled, false);
 });
 
-runTest("applyFrameworkRules (unknown) returns unmodified state", (fm) => {
+test("applyFrameworkRules (unknown) returns unmodified state", () => {
+    const fm = new FilterManager();
     const baseState = fm.createDefaultFilterState();
     const unknownState = fm.applyFrameworkRules('unknown', baseState);
     assert.deepStrictEqual(unknownState, baseState);
 });
 
-// 3. Test getEnabledFilters
-runTest("getEnabledFilters returns only enabled and non-disabled filters", (fm) => {
+test("getEnabledFilters returns only enabled and non-disabled filters", () => {
+    const fm = new FilterManager();
     const mockState = {
         id: { enabled: true, disabled: false },
         css: { enabled: true, disabled: false },
-        linkText: { enabled: false, disabled: true }, // Disabled by framework
-        xpath: { enabled: false, disabled: false }    // Manually disabled by user
+        linkText: { enabled: false, disabled: true },
+        xpath: { enabled: false, disabled: false }
     };
     const enabledFilters = fm.getEnabledFilters(mockState);
     assert.deepStrictEqual(enabledFilters, ['id', 'css']);
 });
 
-// 4. Test validateFilterCombination
-runTest("validateFilterCombination (cypress valid) returns valid: true", (fm) => {
+test("validateFilterCombination (cypress valid) returns valid: true", () => {
+    const fm = new FilterManager();
     const validCypress = fm.validateFilterCombination(['id', 'css'], 'cypress');
     assert.strictEqual(validCypress.valid, true);
     assert.deepStrictEqual(validCypress.issues, []);
 });
 
-runTest("validateFilterCombination (cypress invalid) returns correct issue", (fm) => {
+test("validateFilterCombination (cypress invalid) returns correct issue", () => {
+    const fm = new FilterManager();
     const invalidCypress = fm.validateFilterCombination(['id', 'linkText'], 'cypress');
     assert.strictEqual(invalidCypress.valid, false);
     assert.deepStrictEqual(invalidCypress.issues, ["linkText is not supported by cypress"]);
 });
 
-runTest("validateFilterCombination (empty) returns correct issue", (fm) => {
+test("validateFilterCombination (empty) returns correct issue", () => {
+    const fm = new FilterManager();
     const emptyFilters = fm.validateFilterCombination([], 'cypress');
     assert.strictEqual(emptyFilters.valid, false);
     assert.deepStrictEqual(emptyFilters.issues, ["At least one locator type must be enabled"]);
 });
 
-// 5. Test getRecommendedFilters
-runTest("getRecommendedFilters (cypress) returns correct recommended filters", (fm) => {
+test("getRecommendedFilters (cypress) returns correct recommended filters", () => {
+    const fm = new FilterManager();
     const cypressRecommended = fm.getRecommendedFilters('cypress');
     assert.deepStrictEqual(cypressRecommended, ['css', 'relativeXpath']);
 });
 
-runTest("getRecommendedFilters (playwright) returns correct recommended filters", (fm) => {
+test("getRecommendedFilters (playwright) returns correct recommended filters", () => {
+    const fm = new FilterManager();
     const playwrightRecommended = fm.getRecommendedFilters('playwright');
     assert.deepStrictEqual(playwrightRecommended, ['css', 'relativeXpath', 'id', 'className']);
 });
 
-runTest("getRecommendedFilters (unknown) returns default recommended filters", (fm) => {
+test("getRecommendedFilters (unknown) returns default recommended filters", () => {
+    const fm = new FilterManager();
     const unknownRecommended = fm.getRecommendedFilters('unknown');
     assert.deepStrictEqual(unknownRecommended, ['id', 'className', 'css', 'relativeXpath']);
 });
 
-runTest("getRecommendedFilters (testFramework with disabled) filters out disabled default recommended filters", (fm) => {
+test("getRecommendedFilters (testFramework with disabled) filters out disabled default recommended filters", () => {
+    const fm = new FilterManager();
     fm.filterRules.framework.testFramework = {
         disabled: ['id']
     };
@@ -118,10 +112,27 @@ runTest("getRecommendedFilters (testFramework with disabled) filters out disable
     assert.deepStrictEqual(testFrameworkRecommended, ['className', 'css', 'relativeXpath']);
 });
 
-console.log(`\nTest Summary:`);
-console.log(`Passed: ${testsPassed}`);
-console.log(`Failed: ${testsFailed}`);
-
-if (testsFailed > 0) {
-    process.exit(1);
+async function runTests() {
+    console.log('\n--- Running FilterManager Unit Tests ---');
+    let passed = 0;
+    for (const { name, fn } of suites) {
+        try {
+            await fn();
+            console.log(`✅ PASSED: ${name}`);
+            passed++;
+        } catch (err) {
+            console.log(`❌ FAILED: ${name}`);
+            console.error(err.message);
+        }
+    }
+    console.log(`Result: ${passed}/${suites.length} tests passed.\n`);
+    if (passed !== suites.length) {
+        process.exit(1);
+    }
 }
+
+if (require.main === module) {
+    runTests();
+}
+
+module.exports = { runTests };

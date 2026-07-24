@@ -1,55 +1,41 @@
 const assert = require('assert');
-const MultiScanManager = require('../services/multi-scan-manager.js');
-global.LocatorXPatterns = require('../config/patterns.js');
+const MultiScanManager = require('../../src/services/multi-scan-manager.js');
+global.LocatorXPatterns = require('../../src/config/patterns.js');
 
-let testsPassed = 0;
-let testsFailed = 0;
+const suites = [];
+const test = (name, fn) => suites.push({ name, fn });
 
-function runTest(name, testFn) {
-    try {
-        const msm = new MultiScanManager();
-        testFn(msm);
-        console.log(`✅ PASS: ${name}`);
-        testsPassed++;
-    } catch (error) {
-        console.error(`❌ FAIL: ${name}`);
-        console.error(`   ${error.message}`);
-        testsFailed++;
-    }
-}
-
-console.log("Starting MultiScanManager & LocatorXPatterns Tests...\n");
-
-// 1. Test getCommonPatterns
-runTest("getCommonPatterns returns patterns for selenium-java", (msm) => {
+test("getCommonPatterns returns patterns for selenium-java", () => {
+    const msm = new MultiScanManager();
     const patterns = msm.getCommonPatterns('selenium-java');
     assert.ok(patterns.find);
     assert.strictEqual(patterns.find.length, 3);
     assert.strictEqual(patterns.find[0].id, 'annotation');
 });
 
-runTest("getCommonPatterns (all) returns all patterns", (msm) => {
+test("getCommonPatterns (all) returns all patterns", () => {
+    const msm = new MultiScanManager();
     const patterns = msm.getCommonPatterns('all');
     assert.ok(Array.isArray(patterns));
     assert.ok(patterns.length > 5);
 });
 
-// 2. Test filterPatterns
-runTest("filterPatterns matches query against label/template/regex", (msm) => {
+test("filterPatterns matches query against label/template/regex", () => {
+    const msm = new MultiScanManager();
     const matches = msm.filterPatterns('getByRole', 'playwright-js');
     assert.strictEqual(matches.length, 1);
     assert.strictEqual(matches[0].id, 'roleLabel');
 });
 
-// 3. Test convertSmartPatternToRegex
-runTest("convertSmartPatternToRegex compiles custom pattern correctly", (msm) => {
+test("convertSmartPatternToRegex compiles custom pattern correctly", () => {
+    const msm = new MultiScanManager();
     const patternInput = 'cy.get("{locator}")';
     const regex = msm.convertSmartPatternToRegex(patternInput);
     assert.strictEqual(regex, 'cy\\.get\\("([^"]+)"\\)');
 });
 
-// 4. Test findMatches with Custom patterns
-runTest("findMatches parses custom pattern matches and runs heuristic type inference", (msm) => {
+test("findMatches parses custom pattern matches and runs heuristic type inference", () => {
+    const msm = new MultiScanManager();
     const text = 'cy.get("#submit-btn"); cy.get("//button[text()=\'Save\']"); cy.get(".btn-primary");';
     const pattern = 'cy\\.get\\("([^"]+)"\\)';
     const matches = msm.findMatches(text, pattern, true, 'cy.get("{locator}")');
@@ -65,8 +51,8 @@ runTest("findMatches parses custom pattern matches and runs heuristic type infer
     assert.strictEqual(matches[2].locator, '.btn-primary');
 });
 
-// 5. Test autoScan
-runTest("autoScan extracts standard framework locators correctly", (msm) => {
+test("autoScan extracts standard framework locators correctly", () => {
+    const msm = new MultiScanManager();
     const sourceCode = `
         @FindBy(id = "username")
         private WebElement usernameField;
@@ -77,8 +63,6 @@ runTest("autoScan extracts standard framework locators correctly", (msm) => {
     `;
 
     const allMatches = msm.autoScan(sourceCode, 'all');
-    
-    // Map to simple locator list for easy assertion
     const locators = allMatches.map(m => m.locator);
     assert.ok(locators.includes('username'));
     assert.ok(locators.includes('.password-input'));
@@ -86,23 +70,19 @@ runTest("autoScan extracts standard framework locators correctly", (msm) => {
     assert.ok(locators.includes("[data-cy='dashboard']"));
 });
 
-// 6. Test code generation with LocatorXPatterns.generate
-runTest("LocatorXPatterns.generate formats locators correctly", (msm) => {
-    // Selenium java
+test("LocatorXPatterns.generate formats locators correctly", () => {
     const selJava = LocatorXPatterns.generate('selenium-java', 'driverFind', 'css', '.btn-login');
     assert.strictEqual(selJava, 'driver.findElement(By.cssSelector(".btn-login"))');
 
-    // Playwright
     const pwJs = LocatorXPatterns.generate('playwright-js', 'locator', 'xpath', '//div');
     assert.strictEqual(pwJs, 'page.locator("xpath=//div")');
 
-    // Cypress
     const cyGet = LocatorXPatterns.generate('cypress', 'get', 'css', '#main');
     assert.strictEqual(cyGet, 'cy.get("#main")');
 });
 
-// 7. Test file reader size and type validations
-runTest("MultiScanManager.readFile rejects unsupported file type", async (msm) => {
+test("MultiScanManager.readFile rejects unsupported file type", async () => {
+    const msm = new MultiScanManager();
     const mockFile = { name: 'malicious.exe', size: 1024 };
     try {
         await msm.readFile(mockFile);
@@ -112,8 +92,9 @@ runTest("MultiScanManager.readFile rejects unsupported file type", async (msm) =
     }
 });
 
-runTest("MultiScanManager.readFile rejects oversized files", async (msm) => {
-    const mockFile = { name: 'large_test.js', size: 3 * 1024 * 1024 }; // 3 MB
+test("MultiScanManager.readFile rejects oversized files", async () => {
+    const msm = new MultiScanManager();
+    const mockFile = { name: 'large_test.js', size: 3 * 1024 * 1024 };
     try {
         await msm.readFile(mockFile);
         assert.fail('Should have rejected the oversized file');
@@ -122,10 +103,27 @@ runTest("MultiScanManager.readFile rejects oversized files", async (msm) => {
     }
 });
 
-console.log(`\nTest Summary:`);
-console.log(`Passed: ${testsPassed}`);
-console.log(`Failed: ${testsFailed}`);
-
-if (testsFailed > 0) {
-    process.exit(1);
+async function runTests() {
+    console.log('\n--- Running MultiScanManager Integration Tests ---');
+    let passed = 0;
+    for (const { name, fn } of suites) {
+        try {
+            await fn();
+            console.log(`✅ PASSED: ${name}`);
+            passed++;
+        } catch (err) {
+            console.log(`❌ FAILED: ${name}`);
+            console.error(err.message);
+        }
+    }
+    console.log(`Result: ${passed}/${suites.length} tests passed.\n`);
+    if (passed !== suites.length) {
+        process.exit(1);
+    }
 }
+
+if (require.main === module) {
+    runTests();
+}
+
+module.exports = { runTests };

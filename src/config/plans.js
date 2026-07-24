@@ -64,7 +64,8 @@ const LocatorXPlans = {
             'ui.contextMenu',
             'ui.settings.excludeNumbers',
             'ui.settings.showTimestamp',
-            'ui.matchtravel'
+            'ui.matchtravel',
+            'module.checkLinks'
         ],
         get pro() {
             return [
@@ -79,7 +80,10 @@ const LocatorXPlans = {
                 'ui.contextMenu.nested',
                 'locator.startsWithXpath',
                 'locator.orXpath',
-                'module.debugger'
+                'module.debugger',
+                'ui.checkLinks.exclusions',
+                'ui.checkLinks.export',
+                'ui.checkLinks.skipHeaderFooter'
             ];
         },
         team: 'ALL' // Grants access to everything
@@ -90,17 +94,20 @@ const LocatorXPlans = {
         free: {
             MAX_SAVED_LOCATORS: 25,
             MAX_POM_PAGES: 3,
-            MAX_HISTORY_ITEMS: 50
+            MAX_HISTORY_ITEMS: 50,
+            MAX_AUDIT_LINKS: 50
         },
         pro: {
             MAX_SAVED_LOCATORS: Infinity,
             MAX_POM_PAGES: Infinity,
-            MAX_HISTORY_ITEMS: 200
+            MAX_HISTORY_ITEMS: 200,
+            MAX_AUDIT_LINKS: Infinity
         },
         team: {
             MAX_SAVED_LOCATORS: Infinity,
             MAX_POM_PAGES: Infinity,
-            MAX_HISTORY_ITEMS: 1000
+            MAX_HISTORY_ITEMS: 1000,
+            MAX_AUDIT_LINKS: Infinity
         }
     }
 };

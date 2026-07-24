@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la ../website)",
+      "Read(//e/LocatorX/**)",
+      "Bash(ls -la ../../)",
+      "Read(//e//**)"
+    ]
+  }
+}

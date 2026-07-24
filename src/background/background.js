@@ -1,9 +1,7 @@
 importScripts('../config/plans.js');
 importScripts('../services/plan-service.js');
 
-// Create context menus on installation
-// Setup context menus based on plan
-// Setup context menus based on plan
+// Create context menus on installation and startup
 const setupContextMenus = async () => {
     await planService.init();
 
@@ -56,8 +54,13 @@ const setupContextMenus = async () => {
 
 // Create context menus on installation & startup
 chrome.runtime.onInstalled.addListener(() => {
-    setupContextMenus();
-    chrome.storage.local.set({ devtoolsActive: false });
+    chrome.storage.local.set({
+        devtoolsActive: false,
+        'locator-x-plan': 'free',
+        'locator-x-settings': { selectedFramework: 'playwright' }
+    }, () => {
+        setupContextMenus();
+    });
 });
 
 chrome.runtime.onStartup.addListener(() => {
@@ -263,6 +266,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             const states = result.lx_tab_states || {};
             sendResponse({ success: true, state: states[message.tabId] || null });
         });
+        return true;
+    } else if (message.action === 'checkUrlStatus') {
+        const { url, timeout = 5000 } = message;
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), timeout);
+
+        fetch(url, { method: 'HEAD', signal: controller.signal })
+            .then(res => {
+                clearTimeout(id);
+                if (res.status === 405) {
+                    // Fall back to GET
+                    const getController = new AbortController();
+                    const getId = setTimeout(() => getController.abort(), timeout);
+                    return fetch(url, { method: 'GET', signal: getController.signal })
+                        .then(res2 => {
+                            clearTimeout(getId);
+                            return { status: res2.status, statusText: res2.statusText, ok: res2.ok };
+                        });
+                }
+                return { status: res.status, statusText: res.statusText, ok: res.ok };
+            })
+            .then(result => {
+                sendResponse({ success: true, ...result });
+            })
+            .catch(err => {
+                clearTimeout(id);
+                sendResponse({ success: false, error: err.message || err.toString() });
+            });
         return true;
     }
     return false;

@@ -1,5 +1,6 @@
 // Auth Sync Content Script
 // Runs on the website to sync auth state with the extension
+const sJson = typeof secureJson !== 'undefined' ? secureJson : (typeof require !== 'undefined' ? require('../utils/secure-json.js') : null);
 
 const EXTENSION_ID = chrome.runtime.id;
 const USERS_KEY = 'locatorx_current_user'; // Matches website implementation
@@ -55,7 +56,7 @@ function syncAuthState(providedUser = null) {
     }
 
     try {
-        const user = providedUser || JSON.parse(localStorage.getItem(USERS_KEY) || 'null');
+        const user = providedUser || (sJson ? sJson.parse(localStorage.getItem(USERS_KEY) || 'null') : JSON.parse(localStorage.getItem(USERS_KEY) || 'null'));
 
         if (user) {
             console.log('Locator-X Sync: Syncing user', user);

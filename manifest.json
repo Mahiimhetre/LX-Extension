@@ -56,6 +56,7 @@
         "https://locator-x.com/*"
       ],
       "js": [
+        "src/utils/secure-json.js",
         "src/content/auth-sync.js"
       ],
       "run_at": "document_end"
@@ -75,6 +76,7 @@
   "web_accessible_resources": [
     {
       "resources": [
+        "src/utils/secure-json.js",
         "src/config/constants.js",
         "src/config/plans.js",
         "src/services/plan-service.js",
