@@ -206,21 +206,23 @@ const LocatorXPatterns = {
      * @param {string} patternInput - The user's input pattern with placeholders.
      */
     convertToRegex(patternInput) {
-        if (!patternInput) return '(id|name|class|data-test-id)="([^"]+)"';
+        if (!patternInput || typeof patternInput !== 'string') return '(id|name|class|data-test-id)="([^"]+)"';
+
+        // Constrain length to avoid overly long input strings
+        const trimmed = patternInput.trim().substring(0, 300);
 
         // 1. Escape regex special chars (like . or *) so they match literally
-        let safePattern = patternInput.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        let safePattern = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         
         // 2. Map {type} placeholder to an alphanumeric capture group
         // This captures things like "id", "name", or "how=how.css"
         if (safePattern.includes('\\{type\\}')) {
-            safePattern = safePattern.replace('\\{type\\}', '([a-zA-Z0-9_.]+)');
+            safePattern = safePattern.replace(/\\\{type\\\}/g, '([a-zA-Z0-9_.]+)');
         }
 
         // 3. Map {locator} placeholder to a capture group for the actual selector
-        // We assume selectors don't contain quotes (since they are usually in quotes)
         if (safePattern.includes('\\{locator\\}')) {
-            safePattern = safePattern.replace('\\{locator\\}', '([^"]+)');
+            safePattern = safePattern.replace(/\\\{locator\\\}/g, '([^"]+)');
         }
         return safePattern;
     },
@@ -233,7 +235,14 @@ const LocatorXPatterns = {
      * @param {string} smartInputVal - The original un-regexed pattern for type inference.
      */
     extractMatches(text, pattern, isCustom, smartInputVal = '') {
-        const regex = new RegExp(pattern, 'g');
+        if (!text || !pattern) return [];
+        let regex;
+        try {
+            regex = new RegExp(pattern, 'g');
+        } catch (e) {
+            console.warn('Invalid regex pattern in extractMatches:', pattern, e);
+            return [];
+        }
         const matches = [...text.matchAll(regex)];
 
         return matches.map((match, index) => {

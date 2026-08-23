@@ -68,6 +68,36 @@ class LocatorGenerator {
         }
     }
 
+    escapeXPathValue(str) {
+        if (str === null || str === undefined) return "''";
+        str = String(str);
+        if (!str.includes("'")) {
+            return `'${str}'`;
+        }
+        if (!str.includes('"')) {
+            return `"${str}"`;
+        }
+        // If string contains BOTH single and double quotes, use XPath 1.0 concat()
+        const parts = [];
+        let current = '';
+        for (let i = 0; i < str.length; i++) {
+            const char = str[i];
+            if (char === "'") {
+                if (current.length > 0) {
+                    parts.push(`'${current}'`);
+                    current = '';
+                }
+                parts.push(`"'"`);
+            } else {
+                current += char;
+            }
+        }
+        if (current.length > 0) {
+            parts.push(`'${current}'`);
+        }
+        return `concat(${parts.join(', ')})`;
+    }
+
     generateAxesXPath(anchor, target) {
         if (!anchor || !target) return null;
         if (anchor === target) return 'self::*';
@@ -103,18 +133,15 @@ class LocatorGenerator {
         let targetPredicate = '';
 
         if (target.id && !this.looksDynamic(target.id)) {
-            const quote = target.id.includes("'") ? '"' : "'";
-            targetPredicate = `[@id=${quote}${target.id}${quote}]`;
+            targetPredicate = `[@id=${this.escapeXPathValue(target.id)}]`;
         } else {
             const text = target.textContent?.trim();
             if (text && text.length > 0 && text.length < 50) {
-                const quote = text.includes("'") ? '"' : "'";
-                targetPredicate = `[normalize-space()=${quote}${text}${quote}]`;
+                targetPredicate = `[normalize-space()=${this.escapeXPathValue(text)}]`;
             } else if (target.className) {
                 const cleaned = this.cleanClassName(target.className).split('.')[0];
                 if (cleaned) {
-                    const quote = cleaned.includes("'") ? '"' : "'";
-                    targetPredicate = `[contains(@class, ${quote}${cleaned}${quote})]`;
+                    targetPredicate = `[contains(@class, ${this.escapeXPathValue(cleaned)})]`;
                 }
             }
         }
@@ -486,8 +513,7 @@ class LocatorGenerator {
 
             // 1. ID
             if (el.id && (!this.config.excludeNumbers || !/\d/.test(el.id))) {
-                const quote = el.id.includes("'") ? '"' : "'";
-                return `${tag}[@id=${quote}${el.id}${quote}]`;
+                return `${tag}[@id=${this.escapeXPathValue(el.id)}]`;
             }
 
             // 2. Important Attributes
@@ -495,8 +521,7 @@ class LocatorGenerator {
             for (const attr of attributes) {
                 const value = el.getAttribute(attr);
                 if (value && (!this.config.excludeNumbers || !/\d/.test(value))) {
-                    const quote = value.includes("'") ? '"' : "'";
-                    return `${tag}[@${attr}=${quote}${value}${quote}]`;
+                    return `${tag}[@${attr}=${this.escapeXPathValue(value)}]`;
                 }
             }
 
@@ -504,8 +529,7 @@ class LocatorGenerator {
             if (LocatorXConfig.TAG_GROUPS.TEXT_CONTAINERS.includes(tag)) {
                 const text = el.textContent?.trim();
                 if (text && text.length > LocatorXConfig.LIMITS.TEXT_MATCH_MIN && text.length < LocatorXConfig.LIMITS.TEXT_MATCH_MAX) {
-                    const quote = text.includes("'") ? '"' : "'";
-                    return `${tag}[normalize-space()=${quote}${text}${quote}]`;
+                    return `${tag}[normalize-space()=${this.escapeXPathValue(text)}]`;
                 }
             }
 
@@ -514,8 +538,7 @@ class LocatorGenerator {
                 const cleaned = this.cleanClassName(el.className);
                 if (cleaned) {
                     const firstClass = cleaned.split(' ')[0];
-                    const quote = firstClass.includes("'") ? '"' : "'";
-                    return `${tag}[contains(@class, ${quote}${firstClass}${quote})]`;
+                    return `${tag}[contains(@class, ${this.escapeXPathValue(firstClass)})]`;
                 }
             }
 
@@ -596,16 +619,14 @@ class LocatorGenerator {
         for (const attr of attrs) {
             const val = element.getAttribute(attr);
             if (val && (!this.config.excludeNumbers || !/\d/.test(val))) {
-                const quote = val.includes("'") ? '"' : "'";
-                return `//${tag}[contains(@${attr}, ${quote}${val}${quote})]`;
+                return `//${tag}[contains(@${attr}, ${this.escapeXPathValue(val)})]`;
             }
         }
 
         // 2. Text Match (if reasonable length)
         const text = element.textContent?.trim();
         if (text && text.length > 2 && text.length < 50) {
-            const quote = text.includes("'") ? '"' : "'";
-            return `//${tag}[contains(text(), ${quote}${text}${quote})]`;
+            return `//${tag}[contains(text(), ${this.escapeXPathValue(text)})]`;
         }
 
         // 3. Class Match
@@ -613,8 +634,7 @@ class LocatorGenerator {
             const cleaned = this.cleanClassName(element.className);
             if (cleaned) {
                 const firstClass = cleaned.split(' ')[0];
-                const quote = firstClass.includes("'") ? '"' : "'";
-                return `//${tag}[contains(@class, ${quote}${firstClass}${quote})]`;
+                return `//${tag}[contains(@class, ${this.escapeXPathValue(firstClass)})]`;
             }
         }
 
@@ -638,8 +658,7 @@ class LocatorGenerator {
                 console.log('[Locator-X] generateLinkTextXPath result: NULL (No text)');
                 return null;
             }
-            const quote = text.includes("'") ? '"' : "'";
-            const res = `//a[text()=${quote}${text}${quote}]`;
+            const res = `//a[text()=${this.escapeXPathValue(text)}]`;
             console.log('[Locator-X] generateLinkTextXPath result:', res);
             return res;
         }
@@ -655,8 +674,7 @@ class LocatorGenerator {
                 console.log('[Locator-X] generatePartialLinkTextXPath result: NULL (No text)');
                 return null;
             }
-            const quote = text.includes("'") ? '"' : "'";
-            const res = `//a[contains(text(),${quote}${text}${quote})]`;
+            const res = `//a[contains(text(),${this.escapeXPathValue(text)})]`;
             console.log('[Locator-X] generatePartialLinkTextXPath result:', res);
             return res;
         }
@@ -669,8 +687,7 @@ class LocatorGenerator {
         // Explicitly check ID first
         const allowId = !this.config.excludeNumbers || !/\d/.test(element.id);
         if (element.id && allowId) {
-            const quote = element.id.includes("'") ? '"' : "'";
-            const res = `//*[@id=${quote}${element.id}${quote}]`;
+            const res = `//*[@id=${this.escapeXPathValue(element.id)}]`;
             console.log('[Locator-X] generateAttributeXPath result (ID):', res);
             return res;
         }
@@ -679,8 +696,7 @@ class LocatorGenerator {
         for (const attr of attrs) {
             const value = element.getAttribute(attr);
             if (value && (!this.config.excludeNumbers || !/\d/.test(value))) {
-                const quote = value.includes("'") ? '"' : "'";
-                const res = `//*[@${attr}=${quote}${value}${quote}]`;
+                const res = `//*[@${attr}=${this.escapeXPathValue(value)}]`;
                 console.log('[Locator-X] generateAttributeXPath result (Attr):', res);
                 return res;
             }
@@ -711,8 +727,7 @@ class LocatorGenerator {
 
                     // If prefix is reasonably long and last part looks dynamic
                     if (prefix.length > 2 && (/\d/.test(lastPart) || lastPart.length > 8)) {
-                        const quote = prefix.includes("'") ? '"' : "'";
-                        const xpath = `//${tag}[starts-with(@${attr}, ${quote}${prefix}${quote})]`;
+                        const xpath = `//${tag}[starts-with(@${attr}, ${this.escapeXPathValue(prefix)})]`;
 
                         // Validate uniqueness
                         if (this.isUnique(xpath)) {
@@ -727,8 +742,7 @@ class LocatorGenerator {
             if (/^[a-zA-Z]+.?\d+$/.test(val)) {
                 const prefix = val.replace(/\d+$/, '');
                 if (prefix.length > 3) {
-                    const quote = prefix.includes("'") ? '"' : "'";
-                    const xpath = `//${tag}[starts-with(@${attr}, ${quote}${prefix}${quote})]`;
+                    const xpath = `//${tag}[starts-with(@${attr}, ${this.escapeXPathValue(prefix)})]`;
                     if (this.isUnique(xpath)) {
                         console.log('[Locator-X] generateStartsWithXPath result (ends with numbers):', xpath);
                         return xpath;
@@ -742,8 +756,7 @@ class LocatorGenerator {
         for (const attr of importantAttrs) {
             const val = element.getAttribute(attr);
             if (val && (!this.config.excludeNumbers || !/\d/.test(val))) {
-                const quote = val.includes("'") ? '"' : "'";
-                const xpath = `//${tag}[starts-with(@${attr}, ${quote}${val}${quote})]`;
+                const xpath = `//${tag}[starts-with(@${attr}, ${this.escapeXPathValue(val)})]`;
                 if (this.isUnique(xpath)) {
                     console.log('[Locator-X] generateStartsWithXPath result (basic starts-with):', xpath);
                     return xpath;
@@ -754,8 +767,7 @@ class LocatorGenerator {
         // 3. Fallback to Text Match starts-with (if unique)
         const text = element.textContent?.trim();
         if (text && text.length > 2 && text.length < 50) {
-            const quote = text.includes("'") ? '"' : "'";
-            const xpath = `//${tag}[starts-with(text(), ${quote}${text}${quote})]`;
+            const xpath = `//${tag}[starts-with(text(), ${this.escapeXPathValue(text)})]`;
             if (this.isUnique(xpath)) {
                 console.log('[Locator-X] generateStartsWithXPath result (text starts-with):', xpath);
                 return xpath;
@@ -772,8 +784,7 @@ class LocatorGenerator {
         // Simple translation for common cases
         const tag = element.tagName.toLowerCase();
         if (element.id && (!this.config.excludeNumbers || !/\d/.test(element.id))) {
-            const quote = element.id.includes("'") ? '"' : "'";
-            return `//${tag}[@id=${quote}${element.id}${quote}]`;
+            return `//${tag}[@id=${this.escapeXPathValue(element.id)}]`;
         }
 
         if (element.className) {
@@ -781,8 +792,7 @@ class LocatorGenerator {
             if (cleaned) {
                 const classes = cleaned.split(' ');
                 const classCond = classes.map(c => {
-                    const q = c.includes("'") ? '"' : "'";
-                    return `contains(@class, ${q}${c}${q})`;
+                    return `contains(@class, ${this.escapeXPathValue(c)})`;
                 }).join(' and ');
                 return `//${tag}[${classCond}]`;
             }
@@ -801,29 +811,25 @@ class LocatorGenerator {
 
         // 1. ID
         if (element.id) {
-            const quote = element.id.includes("'") ? '"' : "'";
-            candidates.push(`@id=${quote}${element.id}${quote}`);
+            candidates.push(`@id=${this.escapeXPathValue(element.id)}`);
         }
 
         // 2. Name
         if (element.name) {
-            const quote = element.name.includes("'") ? '"' : "'";
-            candidates.push(`@name=${quote}${element.name}${quote}`);
+            candidates.push(`@name=${this.escapeXPathValue(element.name)}`);
         }
 
         // 3. Text
         const text = element.textContent?.trim();
         if (text && text.length > 0 && text.length < 30) {
-            const quote = text.includes("'") ? '"' : "'";
-            candidates.push(`text()=${quote}${text}${quote}`);
+            candidates.push(`text()=${this.escapeXPathValue(text)}`);
         }
 
         // 4. Class (Primary only)
         if (element.className && typeof element.className === 'string') {
             const primary = element.className.split(' ')[0];
             if (primary) {
-                const quote = primary.includes("'") ? '"' : "'";
-                candidates.push(`contains(@class, ${quote}${primary}${quote})`);
+                candidates.push(`contains(@class, ${this.escapeXPathValue(primary)})`);
             }
         }
 
@@ -839,16 +845,6 @@ class LocatorGenerator {
         }
 
         return null;
-    }
-
-    getImportantAttributes(element) {
-        const important = ['data-testid', 'data-test', 'data-cy', 'aria-label'];
-        const attrs = {};
-        important.forEach(attr => {
-            const val = element.getAttribute(attr);
-            if (val) attrs[attr] = val;
-        });
-        return attrs;
     }
 
 
@@ -997,8 +993,8 @@ class LocatorGenerator {
 
 
     // Evaluate XPath across Shadow boundaries (by recursing evaluate)
-    evaluateXPathDeep(xpath, root = document, results = [], limit = Infinity) {
-        if (results.length >= limit) return results;
+    evaluateXPathDeep(xpath, root = document, results = [], limit = Infinity, currentDepth = 0, maxDepth = 10) {
+        if (results.length >= limit || currentDepth > maxDepth) return results;
         if (root.host && this.isExtensionElement(root.host)) return results;
         try {
             const res = document.evaluate(xpath, root, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
@@ -1015,22 +1011,22 @@ class LocatorGenerator {
             }
         }
 
-        if (results.length >= limit) return results;
+        if (results.length >= limit || currentDepth >= maxDepth) return results;
 
         // Recurse into Shadow DOM (XPath doesn't natively cross boundaries)
         const all = root.querySelectorAll('*');
         for (const el of all) {
             if (results.length >= limit) break;
             if (el.shadowRoot) {
-                this.evaluateXPathDeep(xpath, el.shadowRoot, results, limit);
+                this.evaluateXPathDeep(xpath, el.shadowRoot, results, limit, currentDepth + 1, maxDepth);
             }
         }
         return results;
     }
 
     // Helper to find all elements across Shadow boundaries
-    querySelectorAllDeep(selector, root = document, results = [], limit = Infinity) {
-        if (results.length >= limit) return results;
+    querySelectorAllDeep(selector, root = document, results = [], limit = Infinity, currentDepth = 0, maxDepth = 10) {
+        if (results.length >= limit || currentDepth > maxDepth) return results;
         if (root.host && this.isExtensionElement(root.host)) return results;
         try {
             const matches = root.querySelectorAll(selector);
@@ -1044,14 +1040,14 @@ class LocatorGenerator {
             if (e.name === 'SyntaxError') throw e;
         }
 
-        if (results.length >= limit) return results;
+        if (results.length >= limit || currentDepth >= maxDepth) return results;
 
         // Search in Shadow Roots only (to avoid double-counting light DOM)
         const all = root.querySelectorAll('*');
         for (const el of all) {
             if (results.length >= limit) break;
             if (el.shadowRoot) {
-                this.querySelectorAllDeep(selector, el.shadowRoot, results, limit);
+                this.querySelectorAllDeep(selector, el.shadowRoot, results, limit, currentDepth + 1, maxDepth);
             }
         }
         return results;
@@ -1070,19 +1066,6 @@ class LocatorGenerator {
             }
         }
         return null;
-    }
-
-    // Performance optimized filter for NodeLists avoiding array allocation
-    _fuzzyFilter(elements, finalLimit, matchFn) {
-        const matches = [];
-        for (let i = 0; i < elements.length; i++) {
-            if (matches.length >= finalLimit) break;
-            const el = elements[i];
-            if (matchFn(el)) {
-                matches.push(el);
-            }
-        }
-        return matches;
     }
 
     validateLocator(selector, strategy, shouldFuzzyMatch = false, limit = 150) {

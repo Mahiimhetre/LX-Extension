@@ -24,28 +24,26 @@ document.addEventListener('SYNC_LOCATOR_X', (event) => {
 // Also check on load and periodically
 syncAuthState();
 
-// Monkey patch localStorage to detect direct setItem calls in the same window
-const originalSetItem = localStorage.setItem;
-localStorage.setItem = function (key, value) {
-    const event = new Event('storage');
-    event.key = key;
-    event.newValue = value;
-    originalSetItem.apply(this, arguments);
-    if (key === USERS_KEY) {
-        syncAuthState();
-    }
-};
+// Safely listen for localStorage modifications via proxy wrapper
+try {
+    const originalSetItem = localStorage.setItem;
+    localStorage.setItem = function (key, value) {
+        Reflect.apply(originalSetItem, this, arguments);
+        if (key === USERS_KEY) {
+            syncAuthState();
+        }
+    };
 
-const originalRemoveItem = localStorage.removeItem;
-localStorage.removeItem = function (key) {
-    const event = new Event('storage');
-    event.key = key;
-    event.newValue = null;
-    originalRemoveItem.apply(this, arguments);
-    if (key === USERS_KEY) {
-        syncAuthState();
-    }
-};
+    const originalRemoveItem = localStorage.removeItem;
+    localStorage.removeItem = function (key) {
+        Reflect.apply(originalRemoveItem, this, arguments);
+        if (key === USERS_KEY) {
+            syncAuthState();
+        }
+    };
+} catch (e) {
+    // Fallback if localStorage is frozen by host page
+}
 
 
 function syncAuthState(providedUser = null) {

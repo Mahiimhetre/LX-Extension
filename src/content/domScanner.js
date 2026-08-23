@@ -266,7 +266,7 @@ class DOMScanner {
                 this.clearHighlights('matches');
             } else if (message.action === 'updateConfig') {
                 this.updateInternalConfig(message.config);
-            } else if (message.action === 'executeDebugger') {
+            } else if (message.action === 'triggerDebugger' || message.action === 'executeDebugger') {
                 setTimeout(() => {
                     debugger;
                 }, 50);
@@ -307,8 +307,13 @@ class DOMScanner {
 
         // Clean up label if unloaded mid-scan
         window.addEventListener('beforeunload', () => {
-            if (this.isActive) this.stopScanning(true);
+            this.destroy();
         });
+    }
+
+    destroy() {
+        if (this.isActive) this.stopScanning(true);
+        this.clearHighlights('all');
     }
 
     updateContextMenuForElement(element) {
@@ -883,7 +888,8 @@ class DOMScanner {
             attrs += ` ${attr.name}="${value}"`;
         }
 
-        return `<${tagName}${attrs}>`;
+        const full = `<${tagName}${attrs}>`;
+        return full.length > 150 ? full.substring(0, 147) + '...' : full;
     }
 
     getElementType(element) {
@@ -939,14 +945,18 @@ class DOMScanner {
     // --- Iframe Awareness Methods ---
 
     detectIframe() {
-        return window.self !== window.top;
+        try {
+            return window.self !== window.top;
+        } catch (e) {
+            return true;
+        }
     }
 
     isCrossOriginIframe() {
         if (!this.detectIframe()) return false;
         try {
-            // Check if we can access top document
-            return !window.top.document;
+            // If accessing location.href on top window throws, it is cross-origin
+            return !window.top.location.href;
         } catch (e) {
             return true;
         }
@@ -960,7 +970,9 @@ class DOMScanner {
                 if (!this.generator) this.generator = new LocatorGenerator();
                 return this.generator.generateRelativeXPath(frame);
             }
-        } catch (e) { }
+        } catch (e) {
+            return "//iframe";
+        }
         return "//iframe";
     }
 
@@ -976,7 +988,7 @@ class DOMScanner {
 
     handleContextMenuLocator(menuId) {
         const element = this.lastRightClickedElement;
-        if (!element) return;
+        if (!element || !document.contains(element)) return;
 
         if (!this.generator) {
             this.generator = new LocatorGenerator();

@@ -98,15 +98,15 @@ class StorageManager {
     async saveLocator(locator) {
         await this.ensureMigrated();
         const saved = await this.getSavedLocators();
-        const existing = saved.find(item => item.locator === locator.locator);
+        const existing = saved.find(item => (item.id && item.id === locator.id) || (item.locator === locator.locator && item.type === locator.type));
 
         if (existing) {
             Object.assign(existing, locator);
         } else {
             saved.push({
+                id: locator.id || Date.now(),
                 ...locator,
-                id: Date.now(),
-                date: new Date().toISOString()
+                date: locator.date || new Date().toISOString()
             });
         }
 

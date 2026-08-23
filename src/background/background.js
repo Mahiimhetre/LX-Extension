@@ -1,3 +1,4 @@
+importScripts('../config/constants.js');
 importScripts('../config/plans.js');
 importScripts('../services/plan-service.js');
 
@@ -69,24 +70,32 @@ chrome.runtime.onStartup.addListener(() => {
 
 // Tab switch listener
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
-    const states = await chrome.storage.session.get(['lx_tab_states']);
-    const tabStates = states.lx_tab_states || {};
-    const state = tabStates[activeInfo.tabId];
+    try {
+        const states = await chrome.storage.session.get(['lx_tab_states']);
+        const tabStates = states.lx_tab_states || {};
+        const state = tabStates[activeInfo.tabId];
 
-    chrome.runtime.sendMessage({
-        action: 'activeTabChanged',
-        tabId: activeInfo.tabId,
-        state: state
-    }).catch(() => { });
+        await chrome.runtime.sendMessage({
+            action: 'activeTabChanged',
+            tabId: activeInfo.tabId,
+            state: state
+        });
+    } catch (err) {
+        // Safe swallow if sidepanel port is not open
+    }
 });
 
 // Tab navigation/reload listener
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-    if (changeInfo.status === 'loading') {
-        chrome.runtime.sendMessage({
-            action: 'tabNavigated',
-            tabId: tabId
-        }).catch(() => {});
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+    if (changeInfo.status === 'loading' && tab && tab.url && !tab.url.startsWith('chrome://')) {
+        try {
+            await chrome.runtime.sendMessage({
+                action: 'tabNavigated',
+                tabId: tabId
+            });
+        } catch (err) {
+            // Safe swallow if target tab sidepanel is inactive
+        }
     }
 });
 
@@ -152,11 +161,18 @@ const handleAuthSync = (message, sendResponse) => {
             return true;
         }
     } else if (message.action === 'SYNC_PROFILE') {
-        const { user } = message.payload;
-        if (user) {
+        const { user } = message.payload || {};
+        if (user && typeof user === 'object') {
             chrome.storage.local.get(['user', 'authToken'], (result) => {
-                const updatedUser = { ...result.user, ...user, _lastUpdated: Date.now() };
-                const tokenToSync = user.token || result.authToken || 'dummy-token-for-sync';
+                const updatedUser = { 
+                    ...(result.user || {}), 
+                    name: typeof user.name === 'string' ? user.name : (result.user?.name || 'User'),
+                    email: typeof user.email === 'string' ? user.email : (result.user?.email || ''),
+                    avatar: typeof user.avatar === 'string' ? user.avatar : (result.user?.avatar || ''),
+                    plan: ['free', 'pro', 'team'].includes(user.plan) ? user.plan : (result.user?.plan || 'free'),
+                    _lastUpdated: Date.now() 
+                };
+                const tokenToSync = user.token || result.authToken || '';
                 const updates = {
                     user: updatedUser,
                     'locator-x-plan': updatedUser.plan || 'free',
@@ -168,6 +184,9 @@ const handleAuthSync = (message, sendResponse) => {
                     sendResponse({ success: true });
                 });
             });
+            return true;
+        } else {
+            sendResponse({ success: false, error: 'Invalid profile payload' });
             return true;
         }
     } else if (message.action === 'LOGOUT') {
@@ -334,24 +353,21 @@ chrome.action.onClicked.addListener((tab) => {
 // Handle sidepanel cleanup on close
 chrome.runtime.onConnect.addListener((port) => {
     if (port.name === 'locatorx-panel') {
-        let trackedTabId = null;
+        const inspectedTabs = new Set();
         port.onMessage.addListener((msg) => {
-            if (msg.action === 'setTrackedTab') {
-                trackedTabId = msg.tabId;
+            if (msg.action === 'setTrackedTab' && msg.tabId) {
+                inspectedTabs.add(msg.tabId);
+            }
+            if (msg.action === 'clearTrackedTab' && msg.tabId) {
+                inspectedTabs.delete(msg.tabId);
             }
         });
 
         port.onDisconnect.addListener(() => {
-            if (trackedTabId) {
-                chrome.tabs.sendMessage(trackedTabId, { action: 'stopScanning', force: true }).catch(() => { });
-            } else {
-                chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-                    const tab = tabs[0];
-                    if (tab && tab.id) {
-                        chrome.tabs.sendMessage(tab.id, { action: 'stopScanning', force: true }).catch(() => { });
-                    }
-                });
-            }
+            inspectedTabs.forEach((tabId) => {
+                chrome.tabs.sendMessage(tabId, { action: 'stopScanning', force: true }).catch(() => { });
+            });
+            inspectedTabs.clear();
         });
     }
 

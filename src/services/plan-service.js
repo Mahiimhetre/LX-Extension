@@ -10,6 +10,7 @@ class PlanService {
         this.currentPlan = 'free';
         this.callbacks = [];
         this.initialized = false;
+        this.initPromise = null;
 
         // Listen for storage changes to handle plan updates reactively
         if (typeof chrome !== 'undefined' && chrome.storage) {
@@ -25,20 +26,25 @@ class PlanService {
      * Initialize the service by fetching the current plan from storage.
      */
     async init() {
-        if (this.initialized) return;
+        if (this.initialized) return this.currentPlan;
+        if (this.initPromise) return this.initPromise;
 
-        return new Promise((resolve) => {
+        this.initPromise = new Promise((resolve) => {
             if (typeof chrome !== 'undefined' && chrome.storage) {
                 chrome.storage.local.get(['locator-x-plan'], (result) => {
                     this.currentPlan = result['locator-x-plan'] || 'free';
                     this.initialized = true;
+                    this.initPromise = null;
                     resolve(this.currentPlan);
                 });
             } else {
                 this.initialized = true;
+                this.initPromise = null;
                 resolve(this.currentPlan);
             }
         });
+
+        return this.initPromise;
     }
 
     /**
@@ -116,8 +122,11 @@ class PlanService {
      * Internal: Applies locked styles and tooltips.
      */
     _lockElement(el, featureId) {
+        this._unlockElement(el);
+
         el.classList.add('feature-locked');
         el.setAttribute('data-locked', 'true');
+        el.setAttribute('data-locked-feature', featureId);
 
         // Visual feedback
         el.style.opacity = '0.5';
@@ -167,19 +176,21 @@ class PlanService {
         const attachUpgradePrompt = (targetEl) => {
             if (!targetEl.hasUpgradeListener) {
                 targetEl.addEventListener('click', (e) => {
-                    if (el.getAttribute('data-locked') === 'true') {
+                    if (targetEl.getAttribute('data-locked') === 'true' || targetEl.querySelector('[data-locked="true"]') || (targetEl.closest && targetEl.closest('[data-locked="true"]'))) {
+                        const feat = targetEl.getAttribute('data-locked-feature') || targetEl.querySelector('[data-locked-feature]')?.getAttribute('data-locked-feature') || featureId;
                         e.preventDefault();
                         e.stopPropagation();
-                        this._showUpgradePrompt(featureId);
+                        this._showUpgradePrompt(feat);
                     }
                 }, true);
 
                 targetEl.addEventListener('keydown', (e) => {
-                    if (el.getAttribute('data-locked') === 'true') {
+                    if (targetEl.getAttribute('data-locked') === 'true' || targetEl.querySelector('[data-locked="true"]') || (targetEl.closest && targetEl.closest('[data-locked="true"]'))) {
                         if ([' ', 'Enter'].includes(e.key)) {
+                            const feat = targetEl.getAttribute('data-locked-feature') || targetEl.querySelector('[data-locked-feature]')?.getAttribute('data-locked-feature') || featureId;
                             e.preventDefault();
                             e.stopPropagation();
-                            this._showUpgradePrompt(featureId);
+                            this._showUpgradePrompt(feat);
                         }
                     }
                 }, true);
@@ -207,6 +218,7 @@ class PlanService {
     _unlockElement(el) {
         el.classList.remove('feature-locked');
         el.removeAttribute('data-locked');
+        el.removeAttribute('data-locked-feature');
         el.style.opacity = '1';
         el.style.cursor = '';
 
@@ -217,6 +229,10 @@ class PlanService {
 
         const badge = el.querySelector('.upgrade-badge');
         if (badge) badge.remove();
+        if (el.parentElement) {
+            const parentBadge = el.parentElement.querySelector('.upgrade-badge');
+            if (parentBadge) parentBadge.remove();
+        }
     }
 
     /**

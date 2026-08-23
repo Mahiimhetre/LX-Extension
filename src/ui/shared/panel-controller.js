@@ -97,6 +97,21 @@ const LocatorX = {
 
 
     utils: {
+        sanitizeHtml(htmlString) {
+            if (typeof htmlString !== 'string') return '';
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(htmlString, 'text/html');
+            const scripts = doc.querySelectorAll('script');
+            scripts.forEach(s => s.remove());
+            const allElements = doc.querySelectorAll('*');
+            allElements.forEach(el => {
+                Array.from(el.attributes).forEach(attr => {
+                    if (attr.name.startsWith('on')) el.removeAttribute(attr.name);
+                });
+            });
+            return doc.body.innerHTML;
+        },
+
         escapeHtml(unsafe) {
             if (typeof unsafe !== 'string') return unsafe;
             return unsafe
@@ -606,7 +621,9 @@ const LocatorX = {
 
             const tagLoc = locators.find(l => l.type === 'TagName');
             const tag = tagLoc && tagLoc.locator ? tagLoc.locator : 'element';
-            return `${tag}_${index + 1}`;
+            let res = `${tag}_${index + 1}`.replace(/[^a-zA-Z0-9_$]/g, '');
+            if (/^[0-9]/.test(res)) res = 'el_' + res;
+            return res || `element_${index + 1}`;
         },
 
         toPascalCase(str) {
@@ -1036,7 +1053,7 @@ const LocatorX = {
             const contentEl = document.getElementById('dynamicContent');
 
             if (titleEl) titleEl.textContent = title;
-            if (contentEl) contentEl.innerHTML = content;
+            if (contentEl) contentEl.innerHTML = LocatorX.utils.sanitizeHtml(content);
 
             await LocatorX.tabs.switch('dynamic');
         },
@@ -1297,8 +1314,13 @@ const LocatorX = {
                     });
                 }
 
+                if (this._dragDropTeardown) {
+                    try { this._dragDropTeardown(); } catch (e) { }
+                    this._dragDropTeardown = null;
+                }
+
                 if (dropZone && fileInput && typeof UniversalDragDrop !== 'undefined') {
-                    UniversalDragDrop.setup(dropZone, fileInput, (files) => {
+                    const ddInstance = UniversalDragDrop.setup(dropZone, fileInput, (files) => {
                         if (files && files.length > 0) {
                             const file = files[0];
                             const allowedExtensions = ['.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.txt'];
@@ -1319,6 +1341,9 @@ const LocatorX = {
                             this.renderInputState();
                         }
                     });
+                    if (ddInstance && typeof ddInstance.teardown === 'function') {
+                        this._dragDropTeardown = ddInstance.teardown;
+                    }
                 }
             }
 
@@ -1583,14 +1608,17 @@ const LocatorX = {
                 type: m.type
             }));
 
-            // Use unified broadcaster for ALL frames
-            const allFrameResults = await LocatorX.utils.broadcastToTab('batchEvaluate', { items }, { allFrames: true });
-
-            this._finalizeBatchResults(items, allFrameResults);
+            // Chunk in batches of 50 to maintain smooth UI responsiveness
+            const chunkSize = 50;
+            for (let i = 0; i < items.length; i += chunkSize) {
+                const chunk = items.slice(i, i + chunkSize);
+                const allFrameResults = await LocatorX.utils.broadcastToTab('batchEvaluate', { items: chunk }, { allFrames: true });
+                await this._finalizeBatchResults(chunk, allFrameResults);
+            }
         },
 
-        _finalizeBatchResults(items, allFrameResults) {
-            items.forEach(async (item) => {
+        async _finalizeBatchResults(items, allFrameResults) {
+            for (const item of items) {
                 let totalCount = 0;
                 let autoSuggestion = null;
                 let isError = false;
@@ -1630,7 +1658,7 @@ const LocatorX = {
                         this._applyAutoCorrection(item.id, autoSuggestion);
                     }
                 }
-            });
+            }
         },
 
         validateMatch(locator, type, matchId) {
@@ -1691,8 +1719,8 @@ const LocatorX = {
                 }
             });
 
-            // Periodically save state (every 3 seconds if active)
-            setInterval(() => this.checkpoint(), 3000);
+            // Periodically save state (every 30 seconds if active)
+            setInterval(() => this.checkpoint(), 30000);
         },
 
         handleTabChange(tabId, state) {
@@ -3377,41 +3405,9 @@ const LocatorX = {
 
             if (!confirmed) return;
 
-            // 1. Reset Framework to Selenium
-            const frameworkSelect = document.getElementById('frameworkSelect');
-            if (frameworkSelect) {
-                frameworkSelect.value = 'selenium';
-                // Trigger change event to update dependencies display and filters availability
-                frameworkSelect.dispatchEvent(new Event('change'));
+            if (LocatorX.filters && typeof LocatorX.filters.reset === 'function') {
+                await LocatorX.filters.reset();
             }
-
-            // 2. Check all AVAILABLE checkboxes (respecting the framework constraints)
-            // The change event above invalidates disabled states, so we can select non-disabled ones
-            const checkboxes = document.querySelectorAll('.loc-type:not(:disabled), .nested-loc-type:not(:disabled)');
-            checkboxes.forEach(cb => cb.checked = true);
-
-            // Update parent checkboxes state
-            const selectAll = document.getElementById('locTypeAll');
-            if (selectAll) selectAll.checked = true;
-
-            const relativeXPath = document.getElementById('relativeXPath');
-            if (relativeXPath && !relativeXPath.disabled) relativeXPath.checked = true;
-
-            LocatorX.filters.updateNestedIcon();
-
-            // 3. Reset Scope to Home
-            if (LocatorX.tabs.current !== 'home') {
-                LocatorX.tabs.switch('home');
-            }
-
-            // 4. Update Storage and Table
-            // We save the current "all checked" state
-            chrome.storage.local.set({ enabledFilters: LocatorX.filters.getEnabledFilterIds() });
-
-            LocatorX.filters.updateTable();
-
-            // 5. Notification
-            LocatorX.notifications.success('Settings reset to defaults');
         }
     },
 
@@ -4145,7 +4141,7 @@ const LocatorX = {
         },
 
         login() {
-            const baseUrl = LocatorXConfig.AUTH_DOMAIN || 'http://localhost:3000';
+            const baseUrl = (typeof LocatorXConfig !== 'undefined' && LocatorXConfig.AUTH_DOMAIN) || 'https://locator-x.com';
             window.open(`${baseUrl}/auth/login`, '_blank');
         },
 
@@ -4866,9 +4862,8 @@ LocatorX.linkAuditor = {
             }
             const pageUrl = activeTab.url;
 
-            const userPlan = (typeof planService !== 'undefined') ? planService.currentPlan : 'free';
-            const isAllowed = (typeof LocatorXPlans !== 'undefined') ? 
-                LocatorXPlans.FEATURES[userPlan]?.includes('ui.checkLinks.skipHeaderFooter') || LocatorXPlans.FEATURES[userPlan] === 'ALL' : false;
+            const isAllowed = (typeof planService !== 'undefined') ? 
+                planService.isEnabled('ui.checkLinks.skipHeaderFooter') : false;
             const skipHeaderFooter = !!(isAllowed && this.skipHeaderFooter);
 
             chrome.tabs.sendMessage(activeTab.id, { action: 'extractPageLinks', skipHeaderFooter }, (response) => {
@@ -5278,9 +5273,8 @@ LocatorX.linkAuditor = {
 
         editBtn.addEventListener('click', () => {
             // Check quick edit feature plan allowance (Pro)
-            const userPlan = (typeof planService !== 'undefined') ? planService.currentPlan : 'free';
-            const isAllowed = (typeof LocatorXPlans !== 'undefined') ?
-                LocatorXPlans.FEATURES[userPlan].includes('ui.quickEdit') || LocatorXPlans.FEATURES[userPlan] === 'ALL' : false;
+            const isAllowed = (typeof planService !== 'undefined') ?
+                planService.isEnabled('ui.quickEdit') : false;
 
             if (!isAllowed) {
                 LocatorX.notifications.info(`Quick edit DOM repair requires a Pro plan. <a href="https://locator-x.com/pricing" target="_blank" style="color: #60a5fa; text-decoration: underline;">Upgrade Now</a>`);
@@ -5294,9 +5288,8 @@ LocatorX.linkAuditor = {
 
     exportResults() {
         // Check plan gating (Pro)
-        const userPlan = (typeof planService !== 'undefined') ? planService.currentPlan : 'free';
-        const isAllowed = (typeof LocatorXPlans !== 'undefined') ?
-            LocatorXPlans.FEATURES[userPlan].includes('ui.checkLinks.export') || LocatorXPlans.FEATURES[userPlan] === 'ALL' : false;
+        const isAllowed = (typeof planService !== 'undefined') ?
+            planService.isEnabled('ui.checkLinks.export') : false;
 
         if (!isAllowed) {
             LocatorX.notifications.info(`CSV export requires a Pro plan. <a href="https://locator-x.com/pricing" target="_blank" style="color: #60a5fa; text-decoration: underline;">Upgrade Now</a>`);

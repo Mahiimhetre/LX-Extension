@@ -64,13 +64,13 @@ const LocatorXPlans = {
             'ui.contextMenu',
             'ui.settings.excludeNumbers',
             'ui.settings.showTimestamp',
-            'ui.matchtravel',
             'module.checkLinks'
         ],
         get pro() {
             return [
                 ...this.free,
                 // Pro Features
+                'ui.matchtravel',
                 'ui.export',
                 'ui.theme.dark',
                 'ui.settings.framework',

@@ -133,6 +133,17 @@ test("getLocatorWarnings should add warning for custom blacklisted IDs in xpath"
     assert.ok(warnings.includes('Contains dynamic ID'));
 });
 
+test("escapeXPathValue should properly format plain, single, double and mixed quotes", () => {
+    const generator = new LocatorGenerator();
+    assert.strictEqual(generator.escapeXPathValue("simple"), "'simple'");
+    assert.strictEqual(generator.escapeXPathValue("don't"), '"don\'t"');
+    assert.strictEqual(generator.escapeXPathValue('say "hello"'), "'say \"hello\"'");
+    assert.strictEqual(
+        generator.escapeXPathValue(`He said "don't"`),
+        `concat('He said "don', "'", 't"')`
+    );
+});
+
 async function runTests() {
     console.log('\n--- Running LocatorGenerator Unit Tests ---');
     let passed = 0;

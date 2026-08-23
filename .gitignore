@@ -7,3 +7,5 @@ dist/
 /temp
 tmp/
 temp/
+.agents/
+.claude/

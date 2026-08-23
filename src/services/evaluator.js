@@ -276,6 +276,7 @@ class Evaluator {
     }
 
     _unwrapCode(code) {
+        if (!code || typeof code !== 'string' || code.length > 5000) return null;
         for (const p of this.patterns) {
             const match = code.match(p.regex);
             if (match) {

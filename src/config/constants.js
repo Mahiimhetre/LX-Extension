@@ -91,6 +91,39 @@ const LocatorXConfig = {
         INTERACTIVE: ['a', 'button', 'input', 'select', 'textarea']
     },
 
+    // Shared Context Menu Mapping
+    CONTEXT_MENU_STRATEGIES: {
+        'copy-id': 'id',
+        'copy-name': 'name',
+        'copy-class': 'className',
+        'copy-rel-xpath': 'relativeXpath',
+        'copy-css': 'css',
+        'copy-jquery': 'jquery',
+        'copy-jspath': 'jsPath',
+        'copy-abs-xpath': 'absoluteXpath'
+    },
+
+    // Framework code templates
+    FRAMEWORK_TEMPLATES: {
+        selenium: {
+            id: (val) => `By.id("${val}")`,
+            name: (val) => `By.name("${val}")`,
+            className: (val) => `By.className("${val}")`,
+            css: (val) => `By.cssSelector("${val}")`,
+            xpath: (val) => `By.xpath("${val}")`
+        },
+        playwright: {
+            id: (val) => `page.locator('#${val}')`,
+            css: (val) => `page.locator('${val}')`,
+            xpath: (val) => `page.locator('${val}')`
+        },
+        cypress: {
+            id: (val) => `cy.get('#${val}')`,
+            css: (val) => `cy.get('${val}')`,
+            xpath: (val) => `cy.xpath('${val}')`
+        }
+    },
+
     // Versioning
     VERSION: '1.0.0'
 };
